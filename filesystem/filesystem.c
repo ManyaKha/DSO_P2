@@ -15,13 +15,59 @@
 #include "filesystem/auxiliary.h"  // Headers for auxiliary functions
 #include "filesystem/metadata.h"   // Type and structure declaration of the file system
 
+#define MOUNTED 1
+#define UNMOUNTED 0
+
+/*System structure*/
+Superblock sBlock;
+Struct_inode listInodes[MAX_FILES];
+
+inodes_active inodes[MAX_FILES];
+
+char block_buffer [BLOCK_SIZE];
+int status_FS = UNMOUNTED;
+
+
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
 {
-	return -1;
+	if(deviceSize<MIN_DISK_SIZE || deviceSize>MAX_DISK_SIZE){
+		return -1;
+	}
+	int num_blocks_system = deviceSize/BLOCK_SIZE;
+	int i;
+
+	memset(&block_buffer, 0, sizeof(block_buffer));
+	for(i=0; i<num_blocks_system; i++){
+		if(bwrite("disk.dat", i, block_buffer)<0){
+			printf("Error initializing system: block %i\n", i);
+			return -1;
+		}
+	}
+
+	sBlock.magic_num = 0x000D5500;
+	sBlock.inodes = MAX_NUM_FILES;
+	sBlock.root_node = 1;
+	sBlock.num_blocks = (deviceSize/BLOCK_SIZE)-1-2;
+	sBlock.first_block  = 3;
+	sBlock.device_size = deviceSize;
+	for(i=0; i<sBlock.inodes; i++){
+		bitmap_setbit(sBlock.i_bitmap, i, 0);
+	}
+	for(i=0; i<sBlock.inodes; i++){
+		bitmap_setbit(sBlock.b_bitmap, i, 0);
+	}
+	for(i=0; i<sBlock.inodes; i++){
+		strcpy(listInodes[i].name, "");
+		listInodes[i].file_size = 0;
+		listInodes[i].type = T_FILE;
+		listInodes[i].direct_block = -1;
+	}
+	syncDisk();
+	return 0;
 }
 
 /*
@@ -30,7 +76,19 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {
-	return -1;
+	if(status_FS==MOUNTED){
+		printf("Error: System file already mounted.\n Execute unmountFS() to continue\n");
+		return -1;
+	}
+	memset(&block_buffer, 0, sizeof(block_buffer));
+	if(bread("disk.dat", 0, block_buffer)<0){
+		printf("Error reading superlock: bread\n");
+		return -1;
+	}
+	memmove(&sBlock, &block_buffer, sizeof(sBlock));
+	if(sBlock.magic_numn != 0x000D5500){
+		return -1;
+	}
 }
 
 /*
