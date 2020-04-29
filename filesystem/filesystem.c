@@ -20,7 +20,12 @@
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
-{
+{	
+	//checking if the deviceSize is correct
+	
+	//
+	
+
 	return -1;
 }
 
