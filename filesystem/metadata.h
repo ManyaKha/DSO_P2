@@ -12,7 +12,7 @@
 
 #define MAX_NUM_FILES 48
 //#define MAX_LENGTH 32
-#define MAX_FILE_SIZE 10240
+#define MAX_size 10240
 #define BLOCK_SIZE 2048
 #define MIN_DISK_SIZE 471040
 #define MAX_DISK_SIZE 614400
@@ -30,25 +30,28 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 }
 
 typedef struct{
-  unsigned int magic_num;
-  unsigned int inodes;
-  unsigned int root_node;
-  unsigned int num_blocks;
-  unsigned int first_block;
-  unsigned int device_size;
-  char i_bitmap[5];
-  char b_bitmap[5];
-  char full[BLOCK_SIZE-36];
-}Superblock;
+  unsigned int magicNumber; /*Superblock magic number_ 0x000D5500*/
+  unsigned int numBlocksInodeMap; /* Number of blocks of the inode map*/
+  unsigned int numBlocksBlockMap; /* Number of blocks of the data map */
+  unsigned int numInodes; /*Number of inodes on the device*/
+  unsigned int rootInode; /*Block number of root inode on the device*/
+  unsigned int numDataBlocks; /* Number of data blocks on the device */
+  unsigned int firstDataBLock; /* Block number of the first block*/
+  unsigned int deviceSize; /* Total device size in bytes*/
+  char padding[992]; /* Padding for filling a block */
+}SuperblockType;
 
  typedef struct{
-   unsigned int type;
-   char name[32];
-   unsigned int file_size;
-   unsigned int direct_block;
- }Struct_inode;
+   //unsigned int type; /*T_FILE or T_DIRECTORY*/
+   char name[32]; /*File name*/
+   unsigned int size; /*File size in bytes*/
+   //unsigned inodeTable[200] /*type==dir. list of inodes from the directory*/
+   unsigned int directBlock; /*Direct block number*/
+   unsigned int indirectBlock; /*Indirect block number*/
+   //char padding[PADDING_I]; /*Padding for filling a block*/
+ }InodeDiskType;
 
   typedef struct{
     int currentbyte;
     int open;
-  }inodes_active;
+  }numInodes_active;

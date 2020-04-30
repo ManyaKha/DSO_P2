@@ -14,7 +14,7 @@
   * @brief 	Escribe en el disco los datos almacenados en las estructuras de datos
   * @return	0 si todo es correcto,-1 en caso de error
   */
- int syncDisk(void);
+ //int syncDisk(void);
 
  /*
   * @brief 	Busca el inodo con el nombre [path] y devuelve su posición
@@ -38,4 +38,4 @@
   * @brief 	Libera bloque
   * @return	0 si todo es correcto, -1 en caso de que estén todos ocupados
   */
- int dfree(int bloque_id);
+ int free(int bloque_id);
