@@ -216,20 +216,24 @@ int mkFS(long deviceSize)
 	sBlock.numDataBlocks = (deviceSize/BLOCK_SIZE)-1-2;
 	sBlock.firstDataBLock  = 3;
 	sBlock.deviceSize = deviceSize;
-	for(i=0; i<sBlock.numInodes; i++){
+	for(i=0; i<sBlocks[0].numInodes; i++){
 		//bitmap_setbit(sBlock.i_bitmap, i, 0);
+		imap[i]=0; //free
 	}
-	for(i=0; i<sBlock.numInodes; i++){
+	for(i=0; i<sBlocks[0].numInodes; i++){
 		//bitmap_setbit(sBlock.b_bitmap, i, 0);
+		bmap[i]=0; //free
 	}
-	for(i=0; i<sBlock.numInodes; i++){
-		strcpy(listnumInodes[i].name, "");
+	for(i=0; i<sBlocks[0].numInodes; i++){
+		/*strcpy(listnumInodes[i].name, "");
 		listnumInodes[i].size = 0;
 		listnumInodes[i].type = T_FILE;
-		listnumInodes[i].directBlock = -1;
+		listnumInodes[i].directBlock = -1;*/
+		memset(&(inodes[i]), 0, sizeof(InodeDiskType));
 	}
-	syncDisk();
-	return 0;
+	//syncDisk();
+	metadata_fromMemoryToDisk();
+	return 1;
 }
 
 /*
@@ -238,11 +242,11 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {
-	if(status_FS==MOUNTED){
+	if(1==mounted){
 		printf("Error: System file already mounted.\n Execute unmountFS() to continue\n");
 		return -1;
 	}
-	memset(&block_buffer, 0, sizeof(block_buffer));
+	/*memset(&block_buffer, 0, sizeof(block_buffer));
 	if(bread("disk.dat", 0, block_buffer)<0){
 		printf("Error reading superlock: bread\n");
 		return -1;
@@ -264,29 +268,33 @@ int mountFS(void)
 		printf("Error reading block with ID %i: bread\n", 1);
 		return -1;
 	}
-	memmove(&listnumInodes[20], &block_buffer, sizeof(listnumInodes[0])*20);
+	memmove(&listnumInodes[20], &block_buffer, sizeof(listnumInodes[0])*20);*/
+	metadata_fromDiskToMemory();
+	mounted = 1;
+	return 1;
 }
 
 /*
  * @brief 	Unmounts the file system from the simulated device.
  * @return 	0 if success, -1 otherwise.
  */
-int unmountFS(void)
-{
-	if(status_FS == UNMOUNTED){
+int unmountFS(void){
+	if(0 == mounted){
 		printf("Error: FS already unmounted\n", );
 		return -1;
 	}
 	int i;
-	for (i=0; i<sBlock.numInodes; i++){
-		if(numInodes[i].open == 1){
-			if(closeFile(i)==0){
+	for (i=0; i<sBlocks[0].numInodes; i++){
+		if(1 ==  inodes_x[i].open){
+			printf("Error: There are open files\n", );
+			return -1;
+			//if(closeFile(i)==0){
 				//bitmap_setbit(sBlock.i_bitmap, i, 0);
 			}
 		}
-	}
-	status_FS = UNMOUNTED;
-	retrun syncDisk();
+	metadata_fromMemoryToDisk();
+	mounted = 0;
+	retrun 1;
 }
 
 /*
@@ -366,17 +374,25 @@ int removeFile(char *fileName)
  */
 int openFile(char *fileName)
 {
-	if(stateFS==UNMOUNTED){
-		printf("Error: FS already unmounted\n");
+	if(0==mounted){
+		printf("Error: FS is unmounted\n");
 		return -2;
 	}
-	if(numInodes[namei(fileName)].open == 1){
+	int inode_id;
+	inode_id =  namei(filename);
+	/*if(numInodes[namei(fileName)].open == 1){
 		printf("File already opened\n", );
 		return -2;
 	}
 	numInodes[namei(fileName)].currentbyte = 0
 	numInodes[namei(fileName)].open= 1;
-	return namei(fileName);
+	return namei(fileName);*/
+	if(inode_id<0){
+		return inode_id;
+	}
+	inode_x[inode_id.f_seek = 0 ;
+	inode_x[inode_id].open = 1;
+	return inode_id;
 }
 
 /*
@@ -385,12 +401,18 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes-1){
+	/*if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes-1){
 		return -1;
 	}
 	numInodes[fileDescriptor].currentbyte = 0;
 	numInodes[fileDescriptor].open = 0;
-	return 0;
+	return 0;*/
+	if (fileDescriptor < 0){
+		return fileDescriptor ;
+	}
+ inode_x[fileDescriptor].f_seek = 0;
+ inode_x[fileDescriptor].open = 0;
+ return 1;
 }
 
 /*
@@ -399,7 +421,7 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes){
+	/*if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes){
 		return -1;
 	}
 	if (!numInodes[fileDescriptor].open){
@@ -420,7 +442,21 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 	bread("disk.dat", DataBLockID, block_buffer);
 	memmove(buffer, block_buffer+numInodes[fileDescriptor].currentbyte, sizeof(&buffer));
 	numInodes[fileDescriptor].currentbyte +=bytesRead;
-	return bytesRead;
+	return bytesRead;*/
+	char b[BLOCK_SIZE];
+	int b_id;
+	if(inode_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].numBytes){
+		numBytes = inodes[fileDescriptor].numBytes - inode_x[fileDescriptor].f_seek;
+	}
+	if(numBytes<=0){
+		return 0;
+	}
+	b_id = bmap(fileDescriptor, inode_x[fileDescriptor].f_seek);
+	bread("disk.dat", b_id; b);
+	memmove(buffer, b+inode_x[fileDescriptor].f_seek, numBytes);
+
+	inode_x[fileDescriptor].f_seek += numBytes;
+	return numBytes;
 }
 
 /*
@@ -429,7 +465,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes){
+	/*if(fileDescriptor<0 || fileDescriptor>sBlock.numInodes){
 		return -1;
 	}
 	if (!numInodes[fileDescriptor].open){
@@ -453,7 +489,22 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	numInodes[fileDescriptor].currentbyte +=bytesWriten;
 	listnumInodes[fileDescriptor].size+=bytesWriten;
 	syncDisk();
-	return bytesWriten;
+	return bytesWriten;*/
+	char b[BLOCK_SIZE],
+	int b_id;
+	if(inode_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE){
+		numBytes = BLOCK_SIZE - inode_x[fileDescriptor].f_seek;
+	}
+	if(numBytes<=0){
+		return 0;
+	}
+	b_id = bmap(fileDescriptor, inode_x[fileDescriptor].f_seek);
+ 	bread("disk.dat", b_id, b);
+ 	memmove(b+inode_x[fileDescriptor].f_seek, buffer, numBytes);
+ 	bwrite("disk.dat", b_id, b);
+ 	inode_x[fileDescriptor].f_seek += numBytes;
+ 	inode[fileDescriptor].size += numBytes;
+ 	return numBytes;
 	}
 
 /*
