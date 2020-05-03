@@ -40,7 +40,7 @@ typedef struct{
   unsigned int rootInode; /*Block number of root inode on the device*/
   unsigned int numDataBlocks; /* Number of data blocks on the device */
   unsigned int firstDataBlock; /* Block number of the first block*/
-  uint16_t int deviceSize; /* Total device size in bytes*/
+  uint16_t deviceSize; /* Total device size in bytes*/
 }SuperblockType;
 
  typedef struct{
