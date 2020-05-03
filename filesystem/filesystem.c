@@ -15,32 +15,30 @@
 #include "filesystem/auxiliary.h"  // Headers for auxiliary functions
 #include "filesystem/metadata.h"   // Type and structure declaration of the file system
 
-/*System structure*/
-SuperblockType sBlocks[1];
-//char imap [numInodes]; //[Block_size*x] ????
-char imap [MAX_NUM_FILES]; //[Block_size*x] ????
-char dbmap [numDataBlocks]; //[Block_size*y] ???
-//InodeDiskType inodes[numInodes];
-InodeDiskType inodes[MAX_NUM_FILES];
-//numInodes_active numInodes[MAX_FILES];
+#define DISK "disk.dat"
 
-//char block_buffer [BLOCK_SIZE];
-//int status_FS = UNMOUNTED;
+/*System structure*/
+SuperblockType sBlock;
+TypeInodeMap i_map;
+TypeBlockMap b_map;
+InodesDiskType inodes;
 
 //Additional in-memory information
 struct{
-	int f_seek;
-	int open;
+	int32_t f_seek;
+	int8_t open;
 } //inode_x[numInodes];
-inode_x[MAX_NUM_FILES];
+inodes_x[NUM_INODES];
 
-int mounted = 0;
+int8_t mounted = 0;
 
 /*Auxiliary functions*/
 
 int metadata_fromDiskToMemory (void){
+	/*char b[BLOCK_SIZE];
 	 // To read 0 block from disk into sBlocks[0]
-	bread("disk.dat", 0, &(sBlocks[0]));
+	bread(DISK), 0, b);
+	memmove(&(sBlock), b, sizeof(SuperblockType)),
 	 // To read the i-node map from disk
 	for (int i =0; i<sBlocks[0].numBlocksInodeMap; i++)
 		bread("disk.dat", 1+i, (char*)imap + i*BLOCK_SIZE);
@@ -50,7 +48,7 @@ int metadata_fromDiskToMemory (void){
 	// To read the i-nodes to main memory (in this example each i-node requires one disk block)
 	for (int i =0; i<(sBlocks[0].numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
 		bread("disk.dat", i+sBlocks[0].rootInode, (char*)inodes + i*BLOCK_SIZE);
-	return 1;
+	return 1;*/
 }
 
 int metadata_fromMemoryToDisk ( void )
@@ -72,7 +70,7 @@ int metadata_fromMemoryToDisk ( void )
 int namei(char *path){
 	int i;
 	//Search inode with path
-	for (i=0; i<sBlocks[0].numInodes; i++) {
+	for (i=0; i<sBlock.numInodes; i++) {
 		if (!strcmp(inodes[i].name, path))
 			return i;
 	}
@@ -81,10 +79,11 @@ int namei(char *path){
 
 int ialloc ( void ){
  // to search for a free i-node
- for (int i=0; i<sBlocks[0].numInodes; i++){
- 	if (imap[i] == 0) {
+ int i;
+ for (i=0; i<sBlock.numInodes; i++){
+ 	if (i_map[i] == 0) {
  		// i-node busy right now
- 		imap[i] = 1;
+ 		i_map[i] = 1;
  		// default values for the i-node
  		memset(&(inodes[i]),0,
  		sizeof(InodeDiskType));
@@ -97,13 +96,14 @@ int ialloc ( void ){
 
 int alloc ( void ){
  char b[BLOCK_SIZE];
- for (int i=0; i<sBlocks[0].numDataBlocks; i++){
- 	if (bmap[i] == 0) {
+ int i;
+ for (i=0; i<sBlock.numDataBlocks; i++){
+ 	if (b_map[i] == 0) {
  		// busy block right now
- 		bmap[i] = 1;
+ 		b_map[i] = 1;
  		// default values for the block
  		memset(b, 0, BLOCK_SIZE);
- 		bwrite("disk.dat", i, b);
+ 		bwrite(DISK, sblock.firstDataBlock+i, b);
  		// it returns the block id
  		return i;
  	}
@@ -113,20 +113,20 @@ int alloc ( void ){
 
 int ifree(int inode_id){
 	//check inode_id vality
-	if(inode_id>sBlocks[0].numInodes)
+	if(inode_id>=sBlock.numInodes)
 		return -1;
 	//free inode
-	imap[inode_id] =  0;
-	return -1;
+	i_map[inode_id] =  0;
+	return 0;
 }
 
 int free(int block_id){
 	//check inode_id vality
-	if(block_id > sBlocks[0].numDataBlocks)
+	if(block_id >= sBlock.numDataBlocks)
 		return -1;
 	//free block
-	bmap[block_id] = 0;
-	return -1;
+	b_map[block_id] = 0;
+	return 0;
 }
 
 int bmap ( int inode_id, int offset )
@@ -134,13 +134,17 @@ int bmap ( int inode_id, int offset )
  int b[BLOCK_SIZE/4] ;
  int logic_block ;
  logic_block = offset / BLOCK_SIZE;
+ if(inode_id>sBlock.numInodes){
+	 return -1;
+ }
  if (logic_block > (1+BLOCK_SIZE/4))
  	return -1;
  // return the associated direct block reference
  if (0 == logic_block)
- 	return inodes[inode_id].directBlock;
- // return the associated reference in the indirect block
- bread("disk.dat", sBlocks[0].firstDataBlock +
+ 	return inodes[inode_id].directBlock[0];
+//NOSOTRAS NO TENEMOS INDIRECTOS. HAY QUE CAMBIARLO.
+// return the associated reference in the indirect block
+ bread(DISK, sBlock.firstDataBlock +
  inodes[inode_id].indirectBlock, b);
  return b[logic_block - 1] ; // 1 direct block -> x-1
 }
@@ -156,10 +160,10 @@ int mkFS(long deviceSize)
 	}
 	sBlocks[0].magicNumber = 0x000D5500;
 	sBlocks[0].numInodes = MAX_NUM_FILES;
-	sBlock[0].rootInode = 1;
-	sBlock[0].numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
-	sBlock[0].firstDataBLock  = 3;
-	sBlock[0].deviceSize = deviceSize;
+	sBlocks[0].rootInode = 1;
+	sBlocks[0].numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
+	sBlocks[0].firstDataBLock  = 3;
+	sBlocks[0].deviceSize = deviceSize;
 	for(i=0; i<sBlocks[0].numInodes; i++){
 		imap[i]=0; //free
 	}
@@ -170,6 +174,34 @@ int mkFS(long deviceSize)
 		memset(&(inodes[i]), 0, sizeof(InodeDiskType));
 	}
 	metadata_fromMemoryToDisk();
+	return 1;
+}
+
+int mountFS(void)
+{
+	if(1==mounted){
+		printf("Error: System file already mounted.\n Execute unmountFS() to continue\n");
+		return -1;
+	}
+	metadata_fromDiskToMemory();
+	mounted = 1;
+	return 1;
+}
+
+int unmountFS(void){
+	if(0 == mounted){
+		printf("Error: FS already unmounted\n");
+		return -1;
+	}
+	int i;
+	for (int i=0; i<sBlocks[0].numInodes; i++){
+		if(1 ==  inode_x[i].open){
+			printf("Error: There are open files\n");
+			return -1;
+			}
+		}
+	metadata_fromMemoryToDisk();
+	mounted = 0;
 	return 1;
 }
 

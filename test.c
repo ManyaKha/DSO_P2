@@ -28,7 +28,7 @@
 int main()
 {
 	int ret;
-	
+
 	///////
 	ret = mkFS(DEV_SIZE);
 	if (ret != 0)
