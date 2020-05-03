@@ -36,7 +36,7 @@ typedef struct{
   unsigned int numInodes; /*Number of inodes on the device*/
   unsigned int rootInode; /*Block number of root inode on the device*/
   unsigned int numDataBlocks; /* Number of data blocks on the device */
-  unsigned int firstDataBLock; /* Block number of the first block*/
+  unsigned int firstDataBlock; /* Block number of the first block*/
   unsigned int deviceSize; /* Total device size in bytes*/
   char padding[992]; /* Padding for filling a block */
 }SuperblockType;
