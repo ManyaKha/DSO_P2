@@ -24,7 +24,7 @@ struct{
 
 
 /*SYSTEM STRUCTURE*//////////////////////////////////////////////////////////////////////////////////////
-SuperblockType sBlocks[0];
+SuperblockType sBlock;
 TypeInodeMap i_map;
 TypeBlockMap b_map;
 InodesDiskType inodes;
@@ -35,43 +35,49 @@ int8_t mounted = 0;
 /*AUXILIARY FUNCTIONS*///////////////////////////////////////////////////////////////////////////////////
 int metadata_fromDiskToMemory (void){
 	char b[BLOCK_SIZE];
-	 // To read 0 block from disk into sBlocks[0]
+	 // To read 0 block from disk into sBlock
 	bread(DEVICE_IMAGE, 0, b);
-	/*memmove(&(sBlocks), b, sizeof(SuperblockType))*/
+	memmove(&(sBlock), b, sizeof(SuperblockType));
 	 // To read the i-node map from disk
-	for (int i =0; i<sBlocks[0].numBlocksInodeMap; i++)
-		bread("disk.dat", 1+i, (char*)i_map + i*BLOCK_SIZE);
+	for (int i =0; i<sBlock.numBlocksInodeMap; i++)
+		bread(DEVICE_IMAGE, 1+i, (char*)i_map + i*BLOCK_SIZE);
+
+
 	 // To read the block map from disk
-	for (int i =0; i<sBlocks[0].numBlocksBlockMap; i++)
-		bread("disk.dat", 1+i+sBlocks[0].numBlocksInodeMap, (char*)b_map + i*BLOCK_SIZE);
+	for (int i =0; i<sBlock.numBlocksBlockMap; i++)
+		bread(DEVICE_IMAGE, 1+i+sBlock.numBlocksInodeMap, (char*)b_map + i*BLOCK_SIZE);
+
 	// To read the i-nodes to main memory (in this example each i-node requires one disk block)
-	for (int i =0; i<(sBlocks[0].numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
-		bread("disk.dat", i+sBlocks[0].rootInode, (char*)inodes + i*BLOCK_SIZE);
+	for (int i =0; i<(sBlock.numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
+	{
+		bread(DEVICE_IMAGE, i+sBlock.rootInode, (char*)inodes + i*BLOCK_SIZE);
+		memmove();
+	}
 	return 1;
 }
 
 int metadata_fromMemoryToDisk ( void ){
 	char b[BLOCK_SIZE];
 
-	// To write block 0 from sBlocks[0] into disk
+	// To write block 0 from sBlock into disk
 	bwrite(DEVICE_IMAGE, 0, b);
 
 	// To write the i-node map to disk
-	for (int i=0; i<sBlocks[0].numBlocksInodeMap; i++)
+	for (int i=0; i<sBlock.numBlocksInodeMap; i++)
 	bwrite(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE));
 	// To write the block map to disk
-	for (int i=0; i<sBlocks[0].numBlocksBlockMap; i++)
-	bwrite(DEVICE_IMAGE, 1+i+sBlocks[0].numBlocksInodeMap, ((char *)b_map + i*BLOCK_SIZE));
+	for (int i=0; i<sBlock.numBlocksBlockMap; i++)
+	bwrite(DEVICE_IMAGE, 1+i+sBlock.numBlocksInodeMap, ((char *)b_map + i*BLOCK_SIZE));
 	// To write the i-nodes to disk (in this example each i-node requires one disk block)
-	for (int i=0; i<(sBlocks[0].numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
-	bwrite(DEVICE_IMAGE, i+sBlocks[0].rootInode, ((char *)inodes + i*BLOCK_SIZE));
+	for (int i=0; i<(sBlock.numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
+	bwrite(DEVICE_IMAGE, i+sBlock.rootInode, ((char *)inodes + i*BLOCK_SIZE));
 	return 1;
 }
 
 int namei(char *path){
 	int i;
 	//Search inode with path
-	for (i=0; i<sBlocks[0].numInodes; i++) {
+	for (i=0; i<sBlock.numInodes; i++) {
 		if (!strcmp(inodes[i].name, path))
 			return i;
 	}
@@ -81,7 +87,7 @@ int namei(char *path){
 int ialloc ( void ){
 	// to search for a free i-node
 	int i;
-	for (i=0; i<sBlocks[0].numInodes; i++){
+	for (i=0; i<sBlock.numInodes; i++){
 		if (i_map[i] == 0) {
 			// i-node busy right now
 			i_map[i] = 1;
@@ -98,13 +104,13 @@ int ialloc ( void ){
 int alloc ( void ){
  char b[BLOCK_SIZE];
  int i;
- for (i=0; i<sBlocks[0].numDataBlocks; i++){
+ for (i=0; i<sBlock.numDataBlocks; i++){
  	if (b_map[i] == 0) {
  		// busy block right now
  		b_map[i] = 1;
  		// default values for the block
  		memset(b, 0, BLOCK_SIZE);
- 		bwrite(DEVICE_IMAGE, sBlocks[0].firstDataBlock+i, b);
+ 		bwrite(DEVICE_IMAGE, sBlock.firstDataBlock+i, b);
  		// it returns the block id
  		return i;
  	}
@@ -114,21 +120,30 @@ int alloc ( void ){
 
 int ifree(int inode_id){
 	//check inode_id vality
-	if(inode_id>=sBlocks[0].numInodes)
+	if(inode_id>=sBlock.numInodes)
 		return -1;
 	//free inode
 	i_map[inode_id] =  0;
 	return 0;
 }
-/*
+
+int free(int block_id){
+	//check inode_id vality
+	if(block_id >= sBlock.numDataBlocks)
+		return -1;
+	//free block
+	b_map[block_id] = 0;
+	return 0;
+}
+
 int bmap ( int inode_id, int offset )
 {
 	int b[BLOCK_SIZE/4] ;
 	int logic_block ;
-	logic_block = offset / BLOCK_SIZE;
-	if(inode_id>sBlocks[0].numInodes){
+	if(inode_id>sBlock.numInodes){
 		return -1;
 	}
+	logic_block = offset / BLOCK_SIZE;
 	if (logic_block > (1+BLOCK_SIZE/4))
 		return -1;
 	// return the associated direct block reference
@@ -136,11 +151,9 @@ int bmap ( int inode_id, int offset )
 		return inodes[inode_id].directBlock[0];
 	//NOSOTRAS NO TENEMOS INDIRECTOS. HAY QUE CAMBIARLO.
 	// return the associated reference in the indirect block
-	bread(DEVICE_IMAGE, sBlocks[0].firstDataBlock, b);
-	inodes[inode_id].directBlock, b); direct or indirect blocks?
+	bread(DEVICE_IMAGE, sBlock.firstDataBlock+inodes[inode_id].directBlock, b);
 	return b[logic_block - 1] ; // 1 direct block -> x-1
 }
-*/
 
 
 /*REQUIRED FUNCTIONS*///////////////////////////////////////////////////////////////////////////////////////////
@@ -151,7 +164,26 @@ int bmap ( int inode_id, int offset )
  */
 int mkFS(long deviceSize)
 {
-	return -1;
+	if(deviceSize<MIN_DISK_SIZE || deviceSize>MAX_DISK_SIZE){
+		return -1;
+	}
+	sBlock.magicNumber = 100366919;
+	sBlock.numInodes = MAX_NUM_FILES;
+	sBlock.rootInode = 1;
+	sBlock.numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
+	sBlock.firstDataBLock  = 3;
+	sBlock.deviceSize = deviceSize;
+	for(int i=0; i<sBlock.numInodes; i++){
+		i_map[i]=0; //free
+	}
+	for(int i=0; i<sBlock.numDataBlocks; i++){
+		b_map[i]=0; //free
+	}
+	for(int i=0; i<sBlock.numInodes; i++){
+		memset(&(inodes[i]), 0, sizeof(InodeDiskType));
+	}
+	metadata_fromMemoryToDisk();
+	return 1;
 }
 
 /*
@@ -179,7 +211,7 @@ int unmountFS(void)
 		printf("Error: FS already unmounted\n");
 		return -1;
 	}
-	for (int i=0; i<sBlocks[0].numInodes; i++){
+	for (int i=0; i<sBlock.numInodes; i++){
 		if(i ==  inodes_x[i].open){
 			printf("Error: There are open files\n");
 			return -1;
