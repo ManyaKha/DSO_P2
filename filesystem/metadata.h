@@ -34,12 +34,14 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 
 typedef struct{
   unsigned int magicNumber; /*Superblock magic number 100366919*/
-  unsigned int numBlocksInodeMap; /* Number of blocks of the inode map*/
-  unsigned int numBlocksBlockMap; /* Number of blocks of the data map */
+  //unsigned int numBlocksInodeMap; /* Number of blocks of the inode map*/
+  //unsigned int numBlocksBlockMap; /* Number of blocks of the data map */
   unsigned int numInodes; /*Number of inodes on the device*/
-  unsigned int rootInode; /*Block number of root inode on the device*/
+  unsigned int numInodesBlocks; /*Number of inodes blocks in the device*/
+  unsigned int rootInodeBlock; /*Block number of root inode on the device*/
   unsigned int numDataBlocks; /* Number of data blocks on the device */
   unsigned int firstDataBlock; /* Block number of the first block*/
+  unsigned int firstMapsBlock; /*Block ID where maps are stored*/
   uint16_t deviceSize; /* Total device size in bytes*/
 }SuperblockType;
 
@@ -52,5 +54,7 @@ typedef struct{
  }InodeDiskType;
 
  typedef InodeDiskType InodesDiskType[NUM_INODES];
+ //inode map
  typedef char TypeInodeMap [NUM_INODES];
+ //data block map
  typedef char TypeBlockMap [NUM_DATA_BLOCKS];

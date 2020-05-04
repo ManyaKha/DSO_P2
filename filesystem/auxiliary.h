@@ -38,4 +38,4 @@
   * @brief 	Libera bloque
   * @return	0 si todo es correcto, -1 en caso de que estén todos ocupados
 */
-int free(int block_id);
+int bfree(int block_id);

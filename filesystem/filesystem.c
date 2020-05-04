@@ -18,8 +18,8 @@
 
 /*ADDITIONAL STRUCTS*////////////////////////////////////////////////////////////////////////////////////
 struct{
-	int32_t f_seek;
-	int8_t open;
+	int32_t f_seek; //read/write seek position
+	int8_t open; //0:false, 1:true
 }inodes_x[NUM_INODES];
 
 
@@ -35,42 +35,40 @@ int8_t mounted = 0;
 /*AUXILIARY FUNCTIONS*///////////////////////////////////////////////////////////////////////////////////
 int metadata_fromDiskToMemory (void){
 	char b[BLOCK_SIZE];
-	 // To read 0 block from disk into sBlock
+	// To read 0 block from disk into sBlock
 	bread(DEVICE_IMAGE, 0, b);
 	memmove(&(sBlock), b, sizeof(SuperblockType));
-	 // To read the i-node map from disk
-	for (int i =0; i<sBlock.numBlocksInodeMap; i++)
-		bread(DEVICE_IMAGE, 1+i, (char*)i_map + i*BLOCK_SIZE);
-
-
-	 // To read the block map from disk
-	for (int i =0; i<sBlock.numBlocksBlockMap; i++)
-		bread(DEVICE_IMAGE, 1+i+sBlock.numBlocksInodeMap, (char*)b_map + i*BLOCK_SIZE);
-
-	// To read the i-nodes to main memory (in this example each i-node requires one disk block)
-	for (int i =0; i<(sBlock.numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
-	{
-		bread(DEVICE_IMAGE, i+sBlock.rootInode, (char*)inodes + i*BLOCK_SIZE);
-		memmove();
+	// To read the i-node map and block map from disk
+	bread(DEVICE_IMAGE, sBlock.firstMapsBlock, b);
+	memmove(&(i_map), b, sizeof(TypeInodeMap));
+	memmove(&(b_map), b+sizeof(TypeInodeMap), sizeof(TypeBlockMap));
+	// To read the i-nodes to main memory
+	int INODES_PER_BLOCK = BLOCK_SIZE / sizeof(InodeDiskType) ;
+	for (int i =0; i<sBlock.numInodesBlocks; i++){
+		bread(DEVICE_IMAGE, i+sBlock.rootInodeBlock, b);
+		memmove(&(inodes[i*INODES_PER_BLOCK]), b, INODES_PER_BLOCK*sizeof(InodeDiskType));
 	}
 	return 1;
 }
 
 int metadata_fromMemoryToDisk ( void ){
 	char b[BLOCK_SIZE];
-
 	// To write block 0 from sBlock into disk
+	memset(b, 0, BLOCK_SIZE) ;
+  memmove(b, &(sBlock), sizeof(SuperblockType)) ;
 	bwrite(DEVICE_IMAGE, 0, b);
-
-	// To write the i-node map to disk
-	for (int i=0; i<sBlock.numBlocksInodeMap; i++)
-	bwrite(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE));
-	// To write the block map to disk
-	for (int i=0; i<sBlock.numBlocksBlockMap; i++)
-	bwrite(DEVICE_IMAGE, 1+i+sBlock.numBlocksInodeMap, ((char *)b_map + i*BLOCK_SIZE));
-	// To write the i-nodes to disk (in this example each i-node requires one disk block)
-	for (int i=0; i<(sBlock.numInodes*sizeof(InodeDiskType)/BLOCK_SIZE); i++)
-	bwrite(DEVICE_IMAGE, i+sBlock.rootInode, ((char *)inodes + i*BLOCK_SIZE));
+	//To write blocks where i-node map and block map is stored
+	memset(b, 0, BLOCK_SIZE) ;
+	memmove(b, &(i_map), sizeof(TypeInodeMap));
+	memmove(b + sizeof(TypeInodeMap), &(b_map), sizeof(TypeBlockMap)) ;
+	bwrite(DEVICE_IMAGE, sBlock.firstMapsBlock, b);
+	// To write the i-node to disk
+	int INODES_PER_BLOCK = BLOCK_SIZE / sizeof(InodeDiskType) ;
+	for (int i=0; i<sBlock.numInodesBlocks; i++){
+		memset(b, 0, BLOCK_SIZE) ;
+    memmove(b, &(inodes[i*INODES_PER_BLOCK]), INODES_PER_BLOCK*sizeof(InodeDiskType));
+		bwrite(DEVICE_IMAGE, 1+i, ((char *)i_map + i*BLOCK_SIZE));
+	}
 	return 1;
 }
 
@@ -92,8 +90,7 @@ int ialloc ( void ){
 			// i-node busy right now
 			i_map[i] = 1;
 			// default values for the i-node
-			memset(&(inodes[i]),0,
-			sizeof(InodeDiskType));
+			memset(&(inodes[i]),0,sizeof(InodeDiskType));
 			// return the i-node indentification
 			return i;
 		}
@@ -127,9 +124,9 @@ int ifree(int inode_id){
 	return 0;
 }
 
-int free(int block_id){
+int bfree(int block_id){
 	//check inode_id vality
-	if(block_id >= sBlock.numDataBlocks)
+	if(block_id>=sBlock.numDataBlocks)
 		return -1;
 	//free block
 	b_map[block_id] = 0;
@@ -138,20 +135,24 @@ int free(int block_id){
 
 int bmap ( int inode_id, int offset )
 {
-	int b[BLOCK_SIZE/4] ;
+	//int b[BLOCK_SIZE/4] ;
+	char b[BLOCK_SIZE];
 	int logic_block ;
+
 	if(inode_id>sBlock.numInodes){
 		return -1;
 	}
+	//logic block associated
 	logic_block = offset / BLOCK_SIZE;
-	if (logic_block > (1+BLOCK_SIZE/4))
+	//if (logic_block > (1+BLOCK_SIZE/4))
+	if (logic_block > (1+BLOCK_SIZE))
 		return -1;
 	// return the associated direct block reference
 	if (0 == logic_block)
 		return inodes[inode_id].directBlock[0];
 	//NOSOTRAS NO TENEMOS INDIRECTOS. HAY QUE CAMBIARLO.
-	// return the associated reference in the indirect block
-	bread(DEVICE_IMAGE, sBlock.firstDataBlock+inodes[inode_id].directBlock, b);
+	// return the associated inode block
+	bread(DEVICE_IMAGE, sBlock.rootInodeBlock, b);
 	return b[logic_block - 1] ; // 1 direct block -> x-1
 }
 
@@ -168,11 +169,15 @@ int mkFS(long deviceSize)
 		return -1;
 	}
 	sBlock.magicNumber = 100366919;
-	sBlock.numInodes = MAX_NUM_FILES;
-	sBlock.rootInode = 1;
-	sBlock.numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
-	sBlock.firstDataBLock  = 3;
+	sBlock.numInodes = NUM_INODES;
+	sBlock.numInodesBlocks = NUM_INODES*sizeof(InodeDiskType)/BLOCK_SIZE;
+	sBlock.rootInodeBlock = 2;
+	//sBlock.numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
+	sBlock.numDataBlocks = NUM_DATA_BLOCKS;
+	sBlock.firstMapsBlock = 1;
+	sBlock.firstDataBlock  = 1 + 1 +sBlock.numInodesBlocks;
 	sBlock.deviceSize = deviceSize;
+
 	for(int i=0; i<sBlock.numInodes; i++){
 		i_map[i]=0; //free
 	}
@@ -182,7 +187,13 @@ int mkFS(long deviceSize)
 	for(int i=0; i<sBlock.numInodes; i++){
 		memset(&(inodes[i]), 0, sizeof(InodeDiskType));
 	}
+
+	char b[BLOCK_SIZE];
 	metadata_fromMemoryToDisk();
+	memset(b, 0, BLOCK_SIZE) ;
+    for (int i=0; i < sBlock.numDataBlocks; i++) {
+         bwrite(DEVICE_IMAGE, sBlock.firstDataBlock + i, b) ;
+    }
 	return 1;
 }
 
@@ -197,6 +208,9 @@ int mountFS(void)
 		return -1;
 	}
 	metadata_fromDiskToMemory();
+	if(100366919 != sBlock.magicNumber){
+		return -1;
+	}
 	mounted = 1;
 	return -1;
 }
@@ -228,7 +242,28 @@ int unmountFS(void)
  */
 int createFile(char *fileName)
 {
-	return -2;
+	int inode_id ;
+
+    // es: comprueba si existe el fichero
+    // en: check file exist
+    inode_id = namei(fileName) ;
+    if (inode_id >= 0) {
+        return -1 ;
+    }
+
+    inode_id = ialloc() ;
+    if (inode_id < 0) {
+        return inode_id ;
+    }
+
+    strcpy(inodes[inode_id].name, fileName) ;
+    inodes[inode_id].type           = T_FILE ;
+    inodes[inode_id].directBlock[0] = 255 ;
+    inodes_x[inode_id].f_seek = 0 ;
+    inodes_x[inode_id].open  = 1 ;
+
+    return inode_id ;
+	//return -2;
 }
 
 /*
@@ -237,7 +272,21 @@ int createFile(char *fileName)
  */
 int removeFile(char *fileName)
 {
-	return -2;
+	int inode_id ;
+
+     // es: obtener inodo a partir del nombre
+     // en: get inode id from name
+     inode_id = namei(fileName) ;
+     if (inode_id < 0) {
+         return inode_id ;
+     }
+
+     bfree(inodes[inode_id].directBlock[0]) ;
+     memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+     ifree(inode_id) ;
+
+    return 1 ;
+	//return -2;
 }
 
 /*
@@ -246,7 +295,15 @@ int removeFile(char *fileName)
  */
 int openFile(char *fileName)
 {
-	return -2;
+	int inode_id ;
+	inode_id = namei(fileName);
+	if (inode_id < 0){
+		return inode_id;
+	}
+	inodes_x[inode_id].f_seek = 0 ;
+  inodes_x[inode_id].open  = 1 ;
+  return inode_id ;
+	//return -2;
 }
 
 /*
@@ -255,7 +312,16 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	return -1;
+	if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
+		{
+				return -1 ;
+		}
+
+		inodes_x[fileDescriptor].f_seek = 0 ;
+		inodes_x[fileDescriptor].open  = 0 ;
+
+		return 1 ;
+	//return -1;
 }
 
 /*
@@ -264,7 +330,38 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	return -1;
+	char b[BLOCK_SIZE] ;
+		int b_id ;
+
+		// es: comprobar parámetros
+		// en: check params
+		if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
+		{
+				return -1 ;
+		}
+
+		// es: reajusta el tamaño
+		// en: ajust size
+		if (inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size) {
+				numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek ;
+		}
+		if (numBytes <= 0) {
+				return 0 ;
+		}
+
+		// es: obtener bloque
+		// en: get block
+		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
+		if (b_id < 0) {
+				return -1 ;
+		}
+		bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+    memmove(buffer, b+inodes_x[fileDescriptor].f_seek, numBytes) ;
+
+     inodes_x[fileDescriptor].f_seek += numBytes ;
+
+     return numBytes ;
+	//return -1;
 }
 
 /*
@@ -273,7 +370,45 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	return -1;
+	char b[BLOCK_SIZE] ;
+     int b_id ;
+
+     // es: comprobar parámetros
+     // en: check params
+     if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
+     {
+         return -1 ;
+     }
+
+     if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
+         numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
+     }
+     if (numBytes <= 0) {
+         return 0 ;
+     }
+
+     // es: obtener bloque
+     // en: get block
+     b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
+     if (255 == b_id) {
+         b_id = alloc() ;
+         if (b_id < 0) {
+             return -1 ;
+         }
+         inodes[fileDescriptor].directBlock[0] = b_id ;
+     }
+
+     // es: lee bloque + actualiza algunos bytes + escribe bloque
+     // en: read block + modify some bytes + write block
+     bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+     memmove(b+inodes_x[fileDescriptor].f_seek, buffer, numBytes) ;
+     bwrite(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+
+     inodes_x[fileDescriptor].f_seek += numBytes ;
+     inodes[fileDescriptor].size += numBytes ;
+
+     return numBytes ;
+	//return -1;
 }
 
 /*
@@ -341,3 +476,97 @@ int removeLn(char *linkName)
 {
     return -2;
 }
+
+
+/*int main()
+{
+   int    ret = 1 ;
+   int    fd = 1 ;
+   char *str1 = "hola mundo..." ;
+   char  str2[20] ;
+
+   printf("\n") ;
+   printf("Size of data structures:\n") ;
+   printf(" * Size of Superblock: %ld bytes.\n", sizeof(SuperblockType)) ;
+   printf(" * Size of InodeDisk:  %ld bytes.\n", sizeof(InodeDiskType)) ;
+   printf(" * Size of InodeMap:   %ld bytes.\n", sizeof(TypeInodeMap)) ;
+   printf(" * Size of BlockMap:   %ld bytes.\n", sizeof(TypeBlockMap)) ;
+
+   printf("\n") ;
+   printf("Tests:\n") ;
+
+   //
+   // mkfs-mount
+   //
+   if (ret != - 1 ){
+       printf(" * nanofs_mkfs(32) -> ") ;
+       ret = mkFS ( 32 );
+       printf("%d\n", ret) ;
+   }
+
+   if (ret != - 1 ){
+       printf(" * nanofs_mount() -> ") ;
+       ret = mountFS ();
+       printf("%d\n", ret) ;
+   }
+
+   //
+   // creat-write-close
+   //
+   if (ret != - 1 ) {
+       printf(" * nanofs_creat('test1.txt') -> ") ;
+       ret = fd = createFile("test1.txt") ;
+       printf("%d\n", ret) ;
+   }
+
+   if (ret != - 1 ) {
+       printf(" * nanofs_write(%d,'%s',%ld) -> ", ret, str1, strlen(str1)) ;
+       ret = writeFile(fd, str1, strlen(str1)) ;
+       printf("%d\n", ret) ;
+   }
+
+   if (ret != - 1 ) {
+       printf(" * nanofs_close(%d) -> ", ret) ;
+       ret = closeFile (fd);
+       printf("%d\n", ret) ;
+   }
+
+   //
+   // open-read-close
+   //
+   if (ret != - 1 )   {
+       printf(" * nanofs_open('test1.txt') -> ") ;
+       ret = fd = openFile("test1.txt") ;
+       printf("%d\n", ret) ;
+   }
+
+   if (ret != - 1 )   {
+       memset(str2, 0, 20) ;
+       printf(" * nanofs_read(%d,'%s',%d) -> ", ret, str2, 13) ;
+       ret = readFile (fd, str2, 13 );
+       printf("%d (%s)\n", ret, str2) ;
+   }
+
+   if (ret != - 1 ){
+       printf(" * nanofs_close(%d) -> ", ret) ;
+       ret = closeFile (fd);
+       printf("%d\n", ret) ;
+   }
+
+   //
+   // unlink-umount
+   //
+   if (ret != - 1 ){
+       printf(" * nanofs_unlink('test1.txt') -> ") ;
+       ret = removeFile("test1.txt") ;
+       printf("%d\n", ret) ;
+   }
+
+   if (ret != - 1 ){
+       printf(" * nanofs_umount() -> ") ;
+       ret = unmountFS ();
+       printf("%d\n", ret) ;
+   }
+
+   return 0 ;
+}*/
