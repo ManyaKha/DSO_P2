@@ -51,7 +51,7 @@ typedef struct{
    uint16_t size; /*File size in bytes*/
    //unsigned inodeTable[200] /*type==dir. list of inodes from the directory*/
    uint8_t directBlock[5]; /*Direct block number array. Max 5 direct blocks*/
-   uint32_t CRC[5]; /*Firma asociada a cada bloque de datos*/
+   //uint32_t CRC[5]; /*Firma asociada a cada bloque de datos*/
  }InodeDiskType;
 
  typedef InodeDiskType InodesDiskType[NUM_INODES];

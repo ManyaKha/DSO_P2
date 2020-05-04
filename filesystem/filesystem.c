@@ -24,13 +24,13 @@ struct{
 
 
 /*SYSTEM STRUCTURE*//////////////////////////////////////////////////////////////////////////////////////
-SuperblockType sBlock;
-TypeInodeMap i_map;
-TypeBlockMap b_map;
+SuperblockType sBlock; //Superblock
+TypeInodeMap i_map; //Inodes map
+TypeBlockMap b_map; //Blocks map
 InodesDiskType inodes;
 
 
-int8_t mounted = 0;
+int8_t mounted = 0; //0:false, 1:true
 
 /*AUXILIARY FUNCTIONS*///////////////////////////////////////////////////////////////////////////////////
 int metadata_fromDiskToMemory (void){
@@ -172,7 +172,7 @@ int mkFS(long deviceSize)
 	}
 	sBlock.magicNumber = 100366919;
 	sBlock.numInodes = NUM_INODES;
-	//REPARTIR INODES EN PARTES IGUALES
+	//REPARTIR INODES EN PARTES IGUALES 
 	sBlock.numInodesBlocks = (NUM_INODES*sizeof(InodeDiskType)+BLOCK_SIZE-1)/BLOCK_SIZE; //BLOCK-1 me iguala para redondear
 	sBlock.rootInodeBlock = 1;
 	sBlock.inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ; //2048/48= 42
@@ -187,13 +187,13 @@ int mkFS(long deviceSize)
 	printf("TypeInodeMap:%ld\n", sizeof(TypeInodeMap));
 	printf("TypeBlockMap:%ld\n", sizeof(TypeBlockMap));
 
-	printf("%d\n", sBlock.numInodesBlocks);
+	/*printf("%d\n", sBlock.numInodesBlocks);
 	printf("%d\n", sBlock.rootInodeBlock);
 	printf("%d\n", sBlock.inodesPerBlock);
 	printf("%d\n", sBlock.numDataBlocks);
 	printf("%d\n", sBlock.firstMapsBlock);
 	printf("%d\n", sBlock.firstDataBlock);
-	printf("%d\n", sBlock.deviceSize);
+	printf("%d\n", sBlock.deviceSize);*/
 
 
 	for(int i=0; i<sBlock.numInodes; i++){
@@ -227,6 +227,7 @@ int mountFS(void)
 	}
 	metadata_fromDiskToMemory();
 	if(100366919 != sBlock.magicNumber){
+		printf("%s\n", "Wrong magic number");
 		return -1;
 	}
 	mounted = 1;
@@ -266,21 +267,24 @@ int createFile(char *fileName)
     // en: check file exist
     inode_id = namei(fileName) ;
     if (inode_id >= 0) {
+				printf("%s\n", "File already exists");
         return -1 ;
     }
 
     inode_id = ialloc() ;
     if (inode_id < 0) {
-        return inode_id ;
+        //return inode_id ;
+				return -2;
     }
 
     strcpy(inodes[inode_id].name, fileName) ;
-    inodes[inode_id].type           = T_FILE ;
+    inodes[inode_id].type = T_FILE ;
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
 
-    return inode_id ;
+    //return inode_id ;
+		return 0 ;
 	//return -2;
 }
 
@@ -288,6 +292,7 @@ int createFile(char *fileName)
  * @brief	Deletes a file, provided it exists in the file system.
  * @return	0 if success, -1 if the file does not exist, -2 in case of error..
  */
+ //TO-DO: -2 – In case of other errors.
 int removeFile(char *fileName)
 {
 	int inode_id ;
@@ -296,14 +301,15 @@ int removeFile(char *fileName)
      // en: get inode id from name
      inode_id = namei(fileName) ;
      if (inode_id < 0) {
-         return inode_id ;
+         //return inode_id ;
+				 return -1;
      }
 
      bfree(inodes[inode_id].directBlock[0]) ;
      memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
      ifree(inode_id) ;
 
-    return 1 ;
+    return 0 ;
 	//return -2;
 }
 
@@ -311,12 +317,14 @@ int removeFile(char *fileName)
  * @brief	Opens an existing file.
  * @return	The file descriptor if possible, -1 if file does not exist, -2 in case of error..
  */
+ //TO-DO: -2 – In case of other errors.
 int openFile(char *fileName)
 {
 	int inode_id ;
 	inode_id = namei(fileName);
 	if (inode_id < 0){
-		return inode_id;
+		return -1;
+		//return inode_id;
 	}
 	//Si inodes[inode_id].type ==  enlace_simbolico
 	//Hallar el nombre al que apunta el enlace_simbolico --> Cuidado al crear los datos del enlace
