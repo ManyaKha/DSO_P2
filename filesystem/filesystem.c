@@ -14,7 +14,9 @@
 #include "filesystem/auxiliary.h"  // Headers for auxiliary functions
 #include "filesystem/metadata.h"   // Type and structure declaration of the file system
 #include "filesystem/blocks_cache.h"
+#include <stdio.h>
 #include <string.h>
+
 
 /*ADDITIONAL STRUCTS*////////////////////////////////////////////////////////////////////////////////////
 struct{
@@ -245,8 +247,9 @@ int unmountFS(void)
 		return -1;
 	}
 	for (int i=0; i<sBlock.numInodes; i++){
-		if(i ==  inodes_x[i].open){
-			printf("Error: There are open files\n");
+		//if(i ==  inodes_x[i].open){
+		if(inodes_x[i].open){
+			printf("Error: There are open files%d\n", i);
 			return -1;
 		}
 	}
@@ -259,6 +262,7 @@ int unmountFS(void)
  * @brief	Creates a new file, provided it it doesn't exist in the file system.
  * @return	0 if success, -1 if the file already exists, -2 in case of error.
  */
+ //CUANDO SE CREA UN ARCHIVO SE CREA ABIERTO DIRECTAMENTE. ????
 int createFile(char *fileName)
 {
 	int inode_id ;
@@ -283,7 +287,6 @@ int createFile(char *fileName)
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
 		//inodes_x[inode_id].CRC[0] = 0;
-
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -345,11 +348,15 @@ int openFile(char *fileName)
  */
 int closeFile(int fileDescriptor)
 {
-	if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
-		{
-				return -1 ;
-		}
-
+	if ((fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes)){
+		return -1 ;
+	} if(strlen(inodes[fileDescriptor].name)==0){
+		printf("NO EXISTE\n");
+		return -1;
+	}if(inodes_x[fileDescriptor].open==0){
+		printf("%s\n", "ALREADY CLOSED FILE");
+		return 0;
+	}
 		inodes_x[fileDescriptor].f_seek = 0 ;
 		inodes_x[fileDescriptor].open  = 0 ;
 
@@ -371,7 +378,13 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 		if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
 		{
 				return -1 ;
-		}
+		}if(strlen(inodes[fileDescriptor].name)==0){
+			 printf("NO EXISTE\n");
+			 return -1;
+		}if(inodes_x[fileDescriptor].open == 0){
+			 printf("ESTA CERRADO\n");
+			 return -1;
+		 }
 
 		// es: reajusta el tamaño
 		// en: ajust size
@@ -412,8 +425,13 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
      {
          return -1 ;
      }
-
-     if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
+		 if(strlen(inodes[fileDescriptor].name)==0){
+			 	printf("NO EXISTE\n");
+		 		return -1;
+		 }if(inodes_x[fileDescriptor].open == 0){
+			 	printf("ESTA CERRADO\n");
+		 		return -1;
+		 }if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
          numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
      }
      if (numBytes <= 0) {
@@ -450,59 +468,45 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  * @brief	Modifies the position of the seek pointer of a file.
  * @return	0 if succes, -1 otherwise.
  */
- /*
-int lseekFile(int fileDescriptor, long offset, int whence)
-{
-	//checking the paramenter of fileDescriptor
-	if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
-	{
-			return -1 ;
+int lseekFile(int fileDescriptor, long offset, int whence){
+	//checking the paramenter of fileDescriptor. MAX:48
+	if ((fileDescriptor<0)||(fileDescriptor>=sBlock.numInodes)){
+		return -1 ;
+	}if(inodes_x[fileDescriptor].open == 0){
+		return -1;
+	}if (offset <= 0) {
+		return 0 ;
 	}
-
-	if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
-			numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
-	}
-	if (numBytes <= 0) {
-			return 0 ;
-	}
-
+	/*printf("LSEEK%d\n", inodes_x[fileDescriptor].f_seek);
+	printf("LSEEKNEW%ld\n", inodes_x[fileDescriptor].f_seek+offset);
+	printf("BLOCK:%d\n", BLOCK_SIZE);
+	if (inodes_x[fileDescriptor].f_seek+offset > BLOCK_SIZE) {
+			offset = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
+			printf("%ld\n", offset);
+	}*/
 	//checking the value of whence
 	//whence:constant value acting as reference for the seek operation
 	//offset:no. of byte to displace the pointer
 
 	//FS_SEEK_CUR: current position
-	if(whence==FS_SEEK_CUR)
-	{
-		if((inodos_x[fileDescriptor].sizeof(inodes_x)+offset) >=0 && (inodos_x[fileDescriptor].sizeof(inodes_x)+offset) < BLOCK_SIZE)
-		{
-			inodes_x[fileDescriptor].sizeof(inodes_x) +=offset;
+	if(whence==FS_SEEK_CUR){
+		if((inodes_x[fileDescriptor].f_seek+offset)>=0&&(inodes_x[fileDescriptor].f_seek+offset)<BLOCK_SIZE){
+			inodes_x[fileDescriptor].f_seek+=offset;
+		}else{
+			if(offset>=0){
+				inodes_x[fileDescriptor].f_seek=2047; //unsure
+			}else{
+				inodes_x[fileDescriptor].f_seek=0;
+			}
 		}
-		else
-		{
-				if(offset>=0)
-				{
-					inodes_x[fileDescriptor].sizeof(inodes_x)=2047; //unsure
-				}
-				else
-				{
-					inodes_x[fileDescriptor].sizeof(inodes_x)=0;
-				}
-		}
-
+	}else if(whence==FS_SEEK_BEGIN){ //FS_SEEK_BEGIN: reference pointed to the beginning of the file
+		inodes_x[fileDescriptor].f_seek=0;
+	}else if(whence==FS_SEEK_END){ //FS_SEEK_END: reference pointed to the end of the file
+		printf("%d\n", inodes[fileDescriptor].size);
+		inodes_x[fileDescriptor].f_seek=2047;
 	}
-	//FS_SEEK_BEGIN: reference pointed to the beginning of the file
-	else if(whence==FS_SEEK_BEGIN)
-	{
-		inodos_x[fileDescriptor].sizeof(inodes_x)=0;
-	}
-	//FS_SEEK_END: reference pointed to the end of the file
-	else if(whence==FS_SEEK_END)
-	{
-		inodos_x[fileDescriptor].sizeof(inodes_x)=2047;
-	}
-
 	return 0;
-}*/
+}
 
 /*
  * @brief	Checks the integrity of the file.
