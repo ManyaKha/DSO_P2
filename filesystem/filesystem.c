@@ -172,7 +172,7 @@ int mkFS(long deviceSize)
 	}
 	sBlock.magicNumber = 100366919;
 	sBlock.numInodes = NUM_INODES;
-	//REPARTIR INODES EN PARTES IGUALES 
+	//REPARTIR INODES EN PARTES IGUALES
 	sBlock.numInodesBlocks = (NUM_INODES*sizeof(InodeDiskType)+BLOCK_SIZE-1)/BLOCK_SIZE; //BLOCK-1 me iguala para redondear
 	sBlock.rootInodeBlock = 1;
 	sBlock.inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ; //2048/48= 42
@@ -282,6 +282,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
+		//inodes_x[inode_id].CRC[0] = 0;
 
     //return inode_id ;
 		return 0 ;
@@ -449,10 +450,59 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  * @brief	Modifies the position of the seek pointer of a file.
  * @return	0 if succes, -1 otherwise.
  */
+ /*
 int lseekFile(int fileDescriptor, long offset, int whence)
 {
-	return -1;
-}
+	//checking the paramenter of fileDescriptor
+	if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
+	{
+			return -1 ;
+	}
+
+	if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
+			numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
+	}
+	if (numBytes <= 0) {
+			return 0 ;
+	}
+
+	//checking the value of whence
+	//whence:constant value acting as reference for the seek operation
+	//offset:no. of byte to displace the pointer
+
+	//FS_SEEK_CUR: current position
+	if(whence==FS_SEEK_CUR)
+	{
+		if((inodos_x[fileDescriptor].sizeof(inodes_x)+offset) >=0 && (inodos_x[fileDescriptor].sizeof(inodes_x)+offset) < BLOCK_SIZE)
+		{
+			inodes_x[fileDescriptor].sizeof(inodes_x) +=offset;
+		}
+		else
+		{
+				if(offset>=0)
+				{
+					inodes_x[fileDescriptor].sizeof(inodes_x)=2047; //unsure
+				}
+				else
+				{
+					inodes_x[fileDescriptor].sizeof(inodes_x)=0;
+				}
+		}
+
+	}
+	//FS_SEEK_BEGIN: reference pointed to the beginning of the file
+	else if(whence==FS_SEEK_BEGIN)
+	{
+		inodos_x[fileDescriptor].sizeof(inodes_x)=0;
+	}
+	//FS_SEEK_END: reference pointed to the end of the file
+	else if(whence==FS_SEEK_END)
+	{
+		inodos_x[fileDescriptor].sizeof(inodes_x)=2047;
+	}
+
+	return 0;
+}*/
 
 /*
  * @brief	Checks the integrity of the file.
