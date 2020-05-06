@@ -45,7 +45,6 @@ int metadata_fromDiskToMemory (void){
 	memmove(&(b_map), b+sizeof(SuperblockType)+sizeof(TypeInodeMap), sizeof(TypeBlockMap));
 
 	// To read the i-nodes to main memory
-	//int inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ; //2048/48= 42
 	for (int i =0; i<sBlock.numInodesBlocks; i++) //numInodesBlocks= 42
 	{
 		bread(DEVICE_IMAGE, sBlock.rootInodeBlock+i, b);
@@ -186,17 +185,9 @@ int mkFS(long deviceSize)
 
 	printf("SuperblockType:%ld\n", sizeof(SuperblockType));
 	printf("InodeDiskType:%ld\n", sizeof(InodeDiskType));
+	printf("InodesDiskType:%ld\n", sizeof(InodesDiskType));
 	printf("TypeInodeMap:%ld\n", sizeof(TypeInodeMap));
 	printf("TypeBlockMap:%ld\n", sizeof(TypeBlockMap));
-
-	/*printf("%d\n", sBlock.numInodesBlocks);
-	printf("%d\n", sBlock.rootInodeBlock);
-	printf("%d\n", sBlock.inodesPerBlock);
-	printf("%d\n", sBlock.numDataBlocks);
-	printf("%d\n", sBlock.firstMapsBlock);
-	printf("%d\n", sBlock.firstDataBlock);
-	printf("%d\n", sBlock.deviceSize);*/
-
 
 	for(int i=0; i<sBlock.numInodes; i++){
 		i_map[i]=0; //free

@@ -10,7 +10,7 @@
  *
  */
 
-//#define MAX_NUM_FILES 48
+//#define MAX_NUM_FILES 48. MAX_INODE_SIZE:42 -> 132 bytes
 #define NUM_INODES 48
 //(NUM_INODES*directBlocks)
 #define NUM_DATA_BLOCKS 240
@@ -40,7 +40,7 @@ typedef struct{
    char name[32+1]; /*File name. mAX 32 + 1(end)*/
    uint16_t size; /*File size in bytes*/
    uint8_t directBlock[5]; /*Direct block number array. Max 5 direct blocks*/
-   //uint8_t CRC[5]; /*Firma asociada a cada bloque de datos*/
+   //uint16_t CRC[5]; /*Firma asociada a cada bloque de datos*/
  }InodeDiskType;
 
  typedef InodeDiskType InodesDiskType[NUM_INODES];
