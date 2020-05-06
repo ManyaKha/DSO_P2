@@ -286,7 +286,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
-		//inodes_x[inode_id].CRC[0] = 0;
+		//inodes[inode_id].CRC[0] = 0;
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -474,36 +474,29 @@ int lseekFile(int fileDescriptor, long offset, int whence){
 		return -1 ;
 	}if(inodes_x[fileDescriptor].open == 0){
 		return -1;
-	}if (offset <= 0) {
-		return 0 ;
+	}if(whence==FS_SEEK_BEGIN){ //FS_SEEK_BEGIN: reference pointed to the beginning of the file
+		inodes_x[fileDescriptor].f_seek=0;
+		printf("BEGINING F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
+	//EL FINAL DEL ARCHIVO ES EL TAMAÑO TOTAL O EL ULTIMO BYTE ESCRITO?
+	}else if(whence==FS_SEEK_END){ //FS_SEEK_END: reference pointed to the end of the file
+		printf("END:%d\n", inodes[fileDescriptor].size);
+		inodes_x[fileDescriptor].f_seek=2047;
+		printf("END F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
 	}
-	/*printf("LSEEK%d\n", inodes_x[fileDescriptor].f_seek);
-	printf("LSEEKNEW%ld\n", inodes_x[fileDescriptor].f_seek+offset);
-	printf("BLOCK:%d\n", BLOCK_SIZE);
-	if (inodes_x[fileDescriptor].f_seek+offset > BLOCK_SIZE) {
-			offset = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
-			printf("%ld\n", offset);
-	}*/
 	//checking the value of whence
 	//whence:constant value acting as reference for the seek operation
 	//offset:no. of byte to displace the pointer
-
-	//FS_SEEK_CUR: current position
-	if(whence==FS_SEEK_CUR){
-		if((inodes_x[fileDescriptor].f_seek+offset)>=0&&(inodes_x[fileDescriptor].f_seek+offset)<BLOCK_SIZE){
+	else if(whence==FS_SEEK_CUR){ //FS_SEEK_CUR: current position
+		//If offset is 0, seek pointer do not displace from FS_SEEK_CUR
+		if(offset==0){
+			return 0 ;
+		//possitive or negative offset not allowing f_seek out of file limits
+		}else if((inodes_x[fileDescriptor].f_seek+offset)>=0&&(inodes_x[fileDescriptor].f_seek+offset)<MAX_FILE_SIZE){
 			inodes_x[fileDescriptor].f_seek+=offset;
+		//Out of file limits. Error
 		}else{
-			if(offset>=0){
-				inodes_x[fileDescriptor].f_seek=2047; //unsure
-			}else{
-				inodes_x[fileDescriptor].f_seek=0;
-			}
+			return -1;
 		}
-	}else if(whence==FS_SEEK_BEGIN){ //FS_SEEK_BEGIN: reference pointed to the beginning of the file
-		inodes_x[fileDescriptor].f_seek=0;
-	}else if(whence==FS_SEEK_END){ //FS_SEEK_END: reference pointed to the end of the file
-		printf("%d\n", inodes[fileDescriptor].size);
-		inodes_x[fileDescriptor].f_seek=2047;
 	}
 	return 0;
 }
