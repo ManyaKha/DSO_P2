@@ -21,6 +21,7 @@
 //#define MAX_DISK_SIZE 614400
 #define MAX_DISK_SIZE 300*BLOCK_SIZE
 #define T_FILE 1
+#define T_LINK 2
 
 typedef struct{
   uint32_t magicNumber; /*Superblock magic number 100366919*/
@@ -35,7 +36,7 @@ typedef struct{
 }SuperblockType;
 
  typedef struct{
-   uint8_t type; /*T_FILE, integridad y links también*/
+   uint8_t type; /*T_FILE, T_LINK, integridad y links también*/
    char name[32+1]; /*File name. mAX 32 + 1(end)*/
    uint16_t size; /*File size in bytes*/
    uint8_t directBlock[5]; /*Direct block number array. Max 5 direct blocks*/

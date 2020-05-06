@@ -546,108 +546,53 @@ int closeFileIntegrity(int fileDescriptor)
  */
 int createLn(char *fileName, char *linkName)
 {
-    return -1;
+	int inode_id ;
+    // en: check file exist
+    inode_id = namei(fileName) ;
+    if (inode_id < 0) {
+				printf("%s\n", "File does not exist");
+        return -1 ;
+    }
+    inode_id = ialloc() ;
+    if (inode_id < 0) {
+				return -2;
+    }
+    strcpy(inodes[inode_id].name, linkName) ;
+    inodes[inode_id].type = T_LINK ;
+    inodes[inode_id].directBlock[0] = 255 ;
+    inodes_x[inode_id].f_seek = 0 ;
+    inodes_x[inode_id].open  = 1 ;
+		char *str = fileName;
+		int numBytes =  strlen(str);
+		if(writeFile(inode_id, str, numBytes)<0){
+			return -1;
+		}
+		if(closeFile(inode_id)<0){
+			return -1;
+		}
+		//inodes[inode_id].CRC[0] = 0;
+    //return inode_id ;
+		return 0 ;
+	//return -2;
 }
 
 /*
  * @brief 	Deletes an existing symbolic link
  * @return 	0 if the file is correct, -1 if the symbolic link does not exist, -2 in case of error.
  */
+
+ //FALTA -2 IN CASE OF ERROR
 int removeLn(char *linkName)
 {
-    return -2;
+	int inode_id ;
+  // en: get inode id from name
+	inode_id = namei(linkName) ;
+  if (inode_id < 0) {
+			return -1;
+  }
+  bfree(inodes[inode_id].directBlock[0]) ;
+  memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+  ifree(inode_id) ;
+
+	return 0 ;
 }
-
-
-/*int main()
-{
-   int    ret = 1 ;
-   int    fd = 1 ;
-   char *str1 = "hola mundo..." ;
-   char  str2[20] ;
-
-   printf("\n") ;
-   printf("Size of data structures:\n") ;
-   printf(" * Size of Superblock: %ld bytes.\n", sizeof(SuperblockType)) ;
-   printf(" * Size of InodeDisk:  %ld bytes.\n", sizeof(InodeDiskType)) ;
-   printf(" * Size of InodeMap:   %ld bytes.\n", sizeof(TypeInodeMap)) ;
-   printf(" * Size of BlockMap:   %ld bytes.\n", sizeof(TypeBlockMap)) ;
-
-   printf("\n") ;
-   printf("Tests:\n") ;
-
-   //
-   // mkfs-mount
-   //
-   if (ret != - 1 ){
-       printf(" * nanofs_mkfs(32) -> ") ;
-       ret = mkFS ( 32 );
-       printf("%d\n", ret) ;
-   }
-
-   if (ret != - 1 ){
-       printf(" * nanofs_mount() -> ") ;
-       ret = mountFS ();
-       printf("%d\n", ret) ;
-   }
-
-   //
-   // creat-write-close
-   //
-   if (ret != - 1 ) {
-       printf(" * nanofs_creat('test1.txt') -> ") ;
-       ret = fd = createFile("test1.txt") ;
-       printf("%d\n", ret) ;
-   }
-
-   if (ret != - 1 ) {
-       printf(" * nanofs_write(%d,'%s',%ld) -> ", ret, str1, strlen(str1)) ;
-       ret = writeFile(fd, str1, strlen(str1)) ;
-       printf("%d\n", ret) ;
-   }
-
-   if (ret != - 1 ) {
-       printf(" * nanofs_close(%d) -> ", ret) ;
-       ret = closeFile (fd);
-       printf("%d\n", ret) ;
-   }
-
-   //
-   // open-read-close
-   //
-   if (ret != - 1 )   {
-       printf(" * nanofs_open('test1.txt') -> ") ;
-       ret = fd = openFile("test1.txt") ;
-       printf("%d\n", ret) ;
-   }
-
-   if (ret != - 1 )   {
-       memset(str2, 0, 20) ;
-       printf(" * nanofs_read(%d,'%s',%d) -> ", ret, str2, 13) ;
-       ret = readFile (fd, str2, 13 );
-       printf("%d (%s)\n", ret, str2) ;
-   }
-
-   if (ret != - 1 ){
-       printf(" * nanofs_close(%d) -> ", ret) ;
-       ret = closeFile (fd);
-       printf("%d\n", ret) ;
-   }
-
-   //
-   // unlink-umount
-   //
-   if (ret != - 1 ){
-       printf(" * nanofs_unlink('test1.txt') -> ") ;
-       ret = removeFile("test1.txt") ;
-       printf("%d\n", ret) ;
-   }
-
-   if (ret != - 1 ){
-       printf(" * nanofs_umount() -> ") ;
-       ret = unmountFS ();
-       printf("%d\n", ret) ;
-   }
-
-   return 0 ;
-}*/
