@@ -62,6 +62,7 @@ int main()
 	///////
 
 	char *str = "I am writing";
+	//Buscar como generar string de tamaño ... o bucle para crear string  
 	ret = writeFile(0, str, strlen(str));
 	if (ret < 0)
 	{

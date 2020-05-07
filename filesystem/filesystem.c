@@ -269,7 +269,6 @@ int unmountFS(void)
  * @brief	Creates a new file, provided it it doesn't exist in the file system.
  * @return	0 if success, -1 if the file already exists, -2 in case of error.
  */
- //CUANDO SE CREA UN ARCHIVO SE CREA ABIERTO DIRECTAMENTE. ????
 int createFile(char *fileName)
 {
 	int inode_id ;
@@ -377,7 +376,7 @@ int closeFile(int fileDescriptor)
  */
 int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	char b[BLOCK_SIZE] ;
+		char b[BLOCK_SIZE] ;
 		int b_id ;
 
 		// es: comprobar parámetros
@@ -404,14 +403,25 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 
 		// es: obtener bloque
 		// en: get block
-		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
-		if (b_id < 0) {
-				return -1 ;
+		int remaining_bytes = numBytes;
+		while(remaining_bytes>0){
+			b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
+			if (b_id < 0) {
+					return -1 ;
+			}
+			bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+			//BLOCK_SIZE-inodes_x[fileDescriptor].f_seek --> numero de bytes que "puedo" escribir/leer todavía en el bloque
+			//CUIDADO: f_seek puede ser > BLOCK_SIZE --> mod
+			int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[fileDescriptor].f_seek%BLOCK_SIZE);
+			//Operador ternario: devuelve minimo
+			remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
+			int already_written_bytes = numBytes - remaining_bytes;
+	    memmove(buffer+already_written_bytes,
+							b+inodes_x[fileDescriptor].f_seek,
+							remaining_bytes_in_block);
+	    inodes_x[fileDescriptor].f_seek += remaining_bytes_in_block ;
+			remaining_bytes = remaining_bytes - remaining_bytes_in_block;
 		}
-		bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
-    memmove(buffer, b+inodes_x[fileDescriptor].f_seek, numBytes) ;
-
-     inodes_x[fileDescriptor].f_seek += numBytes ;
 
      return numBytes ;
 	//return -1;
@@ -465,7 +475,9 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		 //{calcular CRC de b, almacenar en inodes[fileDescriptor].CRC[b_id]}
 
      inodes_x[fileDescriptor].f_seek += numBytes ;
-     inodes[fileDescriptor].size += numBytes ;
+		 if(inodes_x[fileDescriptor].f_seek>inodes[fileDescriptor].size){
+			 inodes[fileDescriptor].size = inodes_x[fileDescriptor].f_seek+1 ;
+		 }
 
      return numBytes ;
 	//return -1;
@@ -477,23 +489,49 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int lseekFile(int fileDescriptor, long offset, int whence){
 	//checking the paramenter of fileDescriptor. MAX:48
+	//SWITCH CASE.
 	if ((fileDescriptor<0)||(fileDescriptor>=sBlock.numInodes)){
 		return -1 ;
 	}if(inodes_x[fileDescriptor].open == 0){
 		return -1;
-	}if(whence==FS_SEEK_BEGIN){ //FS_SEEK_BEGIN: reference pointed to the beginning of the file
+	}
+
+	switch (whence) {
+		case FS_SEEK_BEGIN:
+			inodes_x[fileDescriptor].f_seek=0;
+			printf("BEGINING F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
+			break;
+		case FS_SEEK_END:
+			printf("END:%d\n", inodes[fileDescriptor].size);
+			inodes_x[fileDescriptor].f_seek= inodes[fileDescriptor].size-1;
+			printf("END F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
+			break;
+		case FS_SEEK_CUR:
+			if(offset==0){
+				return 0 ;
+			//possitive or negative offset not allowing f_seek out of file limits
+			}else if((inodes_x[fileDescriptor].f_seek+offset)>=0&&(inodes_x[fileDescriptor].f_seek+offset)<MAX_FILE_SIZE){
+				inodes_x[fileDescriptor].f_seek+=offset;
+			//Out of file limits. Error
+			}else{
+				return -1;
+			}
+			break;
+	}
+
+	/*if(whence==FS_SEEK_BEGIN){ //FS_SEEK_BEGIN: reference pointed to the beginning of the file
 		inodes_x[fileDescriptor].f_seek=0;
 		printf("BEGINING F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
 	//EL FINAL DEL ARCHIVO ES EL TAMAÑO TOTAL O EL ULTIMO BYTE ESCRITO?
 	}else if(whence==FS_SEEK_END){ //FS_SEEK_END: reference pointed to the end of the file
 		printf("END:%d\n", inodes[fileDescriptor].size);
-		inodes_x[fileDescriptor].f_seek=2047;
+		inodes_x[fileDescriptor].f_seek= inodes[fileDescriptor].size-1;
 		printf("END F_SEEK:%d\n", inodes_x[fileDescriptor].f_seek);
-	}
+	}*/
 	//checking the value of whence
 	//whence:constant value acting as reference for the seek operation
 	//offset:no. of byte to displace the pointer
-	else if(whence==FS_SEEK_CUR){ //FS_SEEK_CUR: current position
+/*	else if(whence==FS_SEEK_CUR){ //FS_SEEK_CUR: current position
 		//If offset is 0, seek pointer do not displace from FS_SEEK_CUR
 		if(offset==0){
 			return 0 ;
@@ -504,7 +542,7 @@ int lseekFile(int fileDescriptor, long offset, int whence){
 		}else{
 			return -1;
 		}
-	}
+	}*/
 	return 0;
 }
 
