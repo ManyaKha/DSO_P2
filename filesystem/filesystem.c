@@ -45,11 +45,18 @@ int metadata_fromDiskToMemory (void){
 	memmove(&(b_map), b+sizeof(SuperblockType)+sizeof(TypeInodeMap), sizeof(TypeBlockMap));
 
 	// To read the i-nodes to main memory
-	for (int i =0; i<sBlock.numInodesBlocks; i++) //numInodesBlocks= 42
+	int remaining_inodes  = NUM_INODES;
+	for (int i =0; i<(sBlock.numInodesBlocks-1); i++) //numInodesBlocks= 32
 	{
 		bread(DEVICE_IMAGE, sBlock.rootInodeBlock+i, b);
 		memmove(&(inodes[i*sBlock.inodesPerBlock]), b, sBlock.inodesPerBlock*sizeof(InodeDiskType));
+		remaining_inodes = remaining_inodes - sBlock.inodesPerBlock;
 	}
+	bread(DEVICE_IMAGE, sBlock.rootInodeBlock+sBlock.numInodesBlocks-1, b);
+	//(sBlock.numInodesBlocks-2)*sBlock.inodesPerBlock
+	printf("Llamo memmove:inodes[%d],%ld bytes\n", NUM_INODES-remaining_inodes, remaining_inodes*sizeof(InodeDiskType));
+
+	memmove(&(inodes[NUM_INODES-remaining_inodes]), b, remaining_inodes*sizeof(InodeDiskType));
 	return 1;
 }
 
@@ -66,11 +73,17 @@ int metadata_fromMemoryToDisk ( void ){
 	// To write the i-node to disk
 	//int inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ;
 	//TO-DO controlar en la ultima iteración si hay menos inodes/block. Para no desperdiciar espacio. Intentar que todos los bloques tengan el mismo numero de inodos.
-	for (int i=0; i<sBlock.numInodesBlocks; i++){
+	int remaining_inodes  = NUM_INODES;
+	for (int i=0; i<sBlock.numInodesBlocks-1; i++){
 		memset(b, 0, BLOCK_SIZE) ;
     memmove(b, &(inodes[i*sBlock.inodesPerBlock]), sBlock.inodesPerBlock*sizeof(InodeDiskType));
 		bwrite(DEVICE_IMAGE, sBlock.rootInodeBlock+i, b);
+		remaining_inodes = remaining_inodes - sBlock.inodesPerBlock;
 	}
+	memset(b, 0, BLOCK_SIZE) ;
+	memmove(b, &(inodes[NUM_INODES-remaining_inodes]), remaining_inodes*sizeof(InodeDiskType));
+	printf("Llamo memmove_write:inodes[%d],%ld bytes\n", NUM_INODES-remaining_inodes, remaining_inodes*sizeof(InodeDiskType));
+	bwrite(DEVICE_IMAGE, sBlock.rootInodeBlock+sBlock.numInodesBlocks-1, b);
 	return 1;
 }
 
@@ -176,7 +189,7 @@ int mkFS(long deviceSize)
 	//REPARTIR INODES EN PARTES IGUALES
 	sBlock.numInodesBlocks = (NUM_INODES*sizeof(InodeDiskType)+BLOCK_SIZE-1)/BLOCK_SIZE; //BLOCK-1 me iguala para redondear
 	sBlock.rootInodeBlock = 1;
-	sBlock.inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ; //2048/48= 42
+	sBlock.inodesPerBlock = BLOCK_SIZE / sizeof(InodeDiskType) ; //2048/48= 32 max
 	//sBlock.numDataBlocks = deviceSize/BLOCK_SIZE;/*?*/
 	sBlock.numDataBlocks = NUM_DATA_BLOCKS;
 	sBlock.firstMapsBlock = 0; //ESTAN EN SUPERBLOQUE
@@ -188,6 +201,9 @@ int mkFS(long deviceSize)
 	printf("InodesDiskType:%ld\n", sizeof(InodesDiskType));
 	printf("TypeInodeMap:%ld\n", sizeof(TypeInodeMap));
 	printf("TypeBlockMap:%ld\n", sizeof(TypeBlockMap));
+	printf("numInodesBlocks:%d\n", sBlock.numInodesBlocks);
+
+
 
 	for(int i=0; i<sBlock.numInodes; i++){
 		i_map[i]=0; //free
