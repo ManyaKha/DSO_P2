@@ -448,28 +448,39 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 		 }if(inodes_x[fileDescriptor].open == 0){
 			 	printf("ESTA CERRADO\n");
 		 		return -1;
-		 }if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
+		 }/*if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
          numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
-     }
+     }*/
+		 if(inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size){
+			 numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek;
+		 }
      if (numBytes <= 0) {
          return 0 ;
      }
 
      // es: obtener bloque
      // en: get block
-     b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
-     if (255 == b_id) {
-         b_id = alloc() ;
-         if (b_id < 0) {
-             return -1 ;
-         }
-         inodes[fileDescriptor].directBlock[0] = b_id ;
-     }
-
+		 int remaining_bytes =  numBytes;
+		 while(remaining_bytes>0){
+			 b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
+			 if (255 == b_id) {
+	         b_id = alloc() ;
+	     		 if (b_id < 0) {
+	            return -1 ;
+	         }
+	         inodes[fileDescriptor].directBlock[0] = b_id ;
+	     }
+		 }
      // es: lee bloque + actualiza algunos bytes + escribe bloque
      // en: read block + modify some bytes + write block
      bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
-     memmove(b+inodes_x[fileDescriptor].f_seek, buffer, numBytes) ;
+		 int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[fileDescriptor].f_seek%BLOCK_SIZE);
+		 remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
+		 int already_written_bytes = numBytes - remaining_bytes;
+     //memmove(b+inodes_x[fileDescriptor].f_seek, buffer, numBytes) ;
+		 memmove(buffer+already_written_bytes,
+							b+inodes_x[fileDescriptor].f_seek,
+							remaining_bytes_in_block);
      bwrite(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
 		 //Si el fichero es con integridad
 		 //{calcular CRC de b, almacenar en inodes[fileDescriptor].CRC[b_id]}
