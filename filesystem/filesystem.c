@@ -564,14 +564,20 @@ int checkFile (char * fileName){
 			return -2;
 	}
 	//File do not have integrity
-	if(inodes[inode_id].CRC[0] == 0){
+	if(!(inodes[inode_id].CRC[0])){
 			printf("%s\n", "FILE DO NOT HAVE INTEGRITY");
 			return -2;
 	}
-	//unsigned char *b = inodes[inode_id].name;
-	unsigned char b[BLOCK_SIZE];
+	/*uint32_t original_crc = inodes[inode_id].CRC[0];
+	char b[BLOCK_SIZE];
+	bread(DEVICE_IMAGE, sBlock.firstDataBlock, b);
 	uint32_t check_crc =  CRC32(b, sizeof(b));
-	printf("%x\n", check_crc);
+	if(original_crc==check_crc){
+		printf("%s\n", "SON IGUALES");
+	}else{
+		printf("ORIGINAL:%x\n", original_crc);
+		printf("A COMPROBAR%x\n", check_crc);
+	}*/
   return -2;
 }
 
@@ -582,7 +588,22 @@ int checkFile (char * fileName){
 
 int includeIntegrity (char * fileName)
 {
-    return -2;
+	int inode_id ;
+	inode_id = namei(fileName);
+	//File does not exist
+	if (inode_id < 0 || inode_id >= sBlock.numInodes){
+		return -1;
+	}
+	//File is opened
+	if(inodes_x[inode_id].open==1){
+			printf("%s\n", "OPEN FILE");
+			return -2;
+	}
+	//File do not have integrity
+	if(!(inodes[inode_id].CRC[0])){
+		printf("%s\n", "PUT CRC");
+	}
+    return 0;
 }
 
 /*
