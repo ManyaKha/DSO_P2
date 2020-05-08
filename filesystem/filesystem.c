@@ -292,7 +292,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
-		//inodes[inode_id].CRC[0] = 0;
+		inodes[inode_id].CRC[0] = 0;
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -433,7 +433,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-	char b[BLOCK_SIZE] ;
+		char b[BLOCK_SIZE] ;
      int b_id ;
 
      // es: comprobar parámetros
@@ -551,9 +551,28 @@ int lseekFile(int fileDescriptor, long offset, int whence){
  * @return	0 if success, -1 if the file is corrupted, -2 in case of error.
  */
 
-int checkFile (char * fileName)
-{
-    return -2;
+int checkFile (char * fileName){
+	int inode_id ;
+	inode_id = namei(fileName);
+	//File does not exist
+	if (inode_id < 0 || inode_id >= sBlock.numInodes){
+		return -2;
+	}
+	//File is opened
+	if(inodes_x[inode_id].open==1){
+			printf("%s\n", "OPEN FILE");
+			return -2;
+	}
+	//File do not have integrity
+	if(inodes[inode_id].CRC[0] == 0){
+			printf("%s\n", "FILE DO NOT HAVE INTEGRITY");
+			return -2;
+	}
+	//unsigned char *b = inodes[inode_id].name;
+	unsigned char b[BLOCK_SIZE];
+	uint32_t check_crc =  CRC32(b, sizeof(b));
+	printf("%x\n", check_crc);
+  return -2;
 }
 
 /*

@@ -62,7 +62,7 @@ int main()
 	///////
 
 	char *str = "I am writing";
-	//Buscar como generar string de tamaño ... o bucle para crear string  
+	//Buscar como generar string de tamaño ... o bucle para crear string
 	ret = writeFile(0, str, strlen(str));
 	if (ret < 0)
 	{
@@ -145,6 +145,16 @@ int main()
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST closeFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
 	///////
+	ret = checkFile ("/test1.txt");
+	if (ret != 0)
+	{
+		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST checkFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);
+		return -1;
+	}
+	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST checkFile ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
+
+	///////
+
 	ret = createLn("/test1.txt", "newLink");
 	if (ret != 0)
 	{
