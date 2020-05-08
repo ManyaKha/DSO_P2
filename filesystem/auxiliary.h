@@ -11,31 +11,50 @@
  */
 
  /*
-  * @brief 	Escribe en el disco los datos almacenados en las estructuras de datos
-  * @return	0 si todo es correcto,-1 en caso de error
+  * @brief 	Writes from disk all data stored into data structures
+  * @return	1 if everthing is correct, -1 in case of error
   */
- //int syncDisk(void);
+  int metadata_fromDiskToMemory (void);
+
+/*
+ * @brief 	Writes in disk all data stored into data structures
+ * @return	1 if everthing is correct, -1 in case of error
+ */
+ int metadata_fromMemoryToDisk (void);
+
 
  /*
-  * @brief 	Busca el inodo con el nombre [path] y devuelve su posición
-  * @return	numInodo si todo es correcto, -1 en caso de error
+  * @brief 	Search the inode with name [path] and returns its position
+  * @return	position if everything is correct, -1 if error
   */
  int namei(char *path);
 
  /*
-  * @brief 	Busca inodos libres
-  * @return	numInodo si todo es correcto, -1 en caso de que estén todos ocupados
+  * @brief 	Search for free inodes
+  * @return	return inode id if everything is correct, -1 if all are busy
   */
  int ialloc(void);
 
  /*
-  * @brief 	Busca bloques de datos libres
-  * @return	numInodo si todo es correcto, -1 en caso de que estén todos ocupados
+  * @brief 	Search for free blocks
+  * @return	return block id if everything is correct, -1 if all are busy ocupados
   */
  int alloc(void);
 
  /*
-  * @brief 	Libera bloque
-  * @return	0 si todo es correcto, -1 en caso de que estén todos ocupados
+  * @brief 	Frees inode with id inode_id
+  * @return	0 if everything is correct, -1 in case of error
+*/
+ int ifree(int inode_id){
+
+ /*
+  * @brief 	Frees block with id block_id
+  * @return	0 if everything is correct, -1 in case of error
 */
 int bfree(int block_id);
+
+/*
+ * @brief 	Searchs the block associated to inode with inode_id id
+ * @return	associated inode block if everything is correct, -1 in case of error
+*/
+int bmap ( int inode_id, int offset )
