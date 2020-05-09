@@ -450,19 +450,19 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}/*if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
          numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
      }*/
-		 
+
 	if(inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size){
 		numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek;
 	}
      if (numBytes <= 0) {
          return 0 ;
      }
-	 
+
      // en: get block
 	int remaining_bytes =  numBytes;
 	while(remaining_bytes>0){
 		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
-		if (255 == b_id) 
+		if (255 == b_id)
 		{
 			b_id = alloc() ;
 	    	if (b_id < 0) {
@@ -486,7 +486,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 			 inodes[fileDescriptor].size = inodes_x[fileDescriptor].f_seek+1 ;
 		}
 	}
-		
+
 	return numBytes;
 }
 
@@ -607,7 +607,17 @@ int includeIntegrity (char * fileName)
 			return -2;
 	}
 	//File do not have integrity
+	/*Por tanto, la solución consistiría en reservar un buffer lo suficientemente
+	grande para almacenar el contenido completo del fichero. Una vez hecha esta
+	reserva, cuyo tamaño sera de tantos bytes como bytes escritos hayan en el
+	fichero, debéis realizar una lectura de cada uno de los bloques y copiarlos a
+	dicho buffer. Finalmente, este buffer es el que pasareis a la función de CRC
+	para implementar el control de integridad que se pide en la práctica.*/
 	if(!(inodes[inode_id].CRC[0])){
+		int size = inodes[inode_id].size;
+		char b[size];
+		readFile(inode_id, b, size);
+		//inodes[inode_id].CRC[0]=CRC32(b, sizeof(b));
 		printf("%s\n", "PUT CRC");
 	}
     return 0;
