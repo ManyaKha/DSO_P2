@@ -1,4 +1,3 @@
-
 /*
  *
  * Operating System Design / Diseño de Sistemas Operativos
@@ -433,65 +432,62 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes)
 {
-		char b[BLOCK_SIZE] ;
+	 char b[BLOCK_SIZE] ;
      int b_id ;
 
-     // es: comprobar parámetros
      // en: check params
      if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) )
      {
          return -1 ;
      }
-		 if(strlen(inodes[fileDescriptor].name)==0){
-			 	printf("NO EXISTE\n");
-		 		return -1;
-		 }if(inodes_x[fileDescriptor].open == 0){
-			 	printf("ESTA CERRADO\n");
-		 		return -1;
-		 }/*if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
+	if(strlen(inodes[fileDescriptor].name)==0){
+		printf("NO EXISTE\n");
+		return -1;
+	}
+	if(inodes_x[fileDescriptor].open == 0){
+		printf("ESTA CERRADO\n");
+		return -1;
+	}/*if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
          numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
      }*/
-		 if(inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size){
-			 numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek;
-		 }
+		 
+	if(inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size){
+		numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek;
+	}
      if (numBytes <= 0) {
          return 0 ;
      }
-
-     // es: obtener bloque
+	 
      // en: get block
-		 int remaining_bytes =  numBytes;
-		 while(remaining_bytes>0){
-			 b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
-			 if (255 == b_id) {
-	         b_id = alloc() ;
-	     		 if (b_id < 0) {
-	            return -1 ;
+	int remaining_bytes =  numBytes;
+	while(remaining_bytes>0){
+		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
+		if (255 == b_id) 
+		{
+			b_id = alloc() ;
+	    	if (b_id < 0) {
+	        	return -1 ;
 	         }
 	         inodes[fileDescriptor].directBlock[0] = b_id ;
-	     }
-		 }
-     // es: lee bloque + actualiza algunos bytes + escribe bloque
-     // en: read block + modify some bytes + write block
-     bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
-		 int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[fileDescriptor].f_seek%BLOCK_SIZE);
-		 remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
-		 int already_written_bytes = numBytes - remaining_bytes;
-     //memmove(b+inodes_x[fileDescriptor].f_seek, buffer, numBytes) ;
-		 memmove(buffer+already_written_bytes,
+	    }
+		//read block + modify some bytes + write block
+    	bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+		int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[fileDescriptor].f_seek%BLOCK_SIZE);
+		remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
+		int already_written_bytes = numBytes - remaining_bytes;
+		memmove(buffer+already_written_bytes,
 							b+inodes_x[fileDescriptor].f_seek,
 							remaining_bytes_in_block);
-     bwrite(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
-		 //Si el fichero es con integridad
-		 //{calcular CRC de b, almacenar en inodes[fileDescriptor].CRC[b_id]}
-
-     inodes_x[fileDescriptor].f_seek += numBytes ;
-		 if(inodes_x[fileDescriptor].f_seek>inodes[fileDescriptor].size){
+		bwrite(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+		inodes_x[fileDescriptor].f_seek += remaining_bytes;
+		remaining_bytes = remaining_bytes - remaining_bytes_in_block;
+		if(inodes_x[fileDescriptor].f_seek>inodes[fileDescriptor].size)
+		{
 			 inodes[fileDescriptor].size = inodes_x[fileDescriptor].f_seek+1 ;
-		 }
-
-     return numBytes ;
-	//return -1;
+		}
+	}
+		
+	return numBytes;
 }
 
 /*

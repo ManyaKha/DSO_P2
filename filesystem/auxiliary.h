@@ -45,7 +45,7 @@
   * @brief 	Frees inode with id inode_id
   * @return	0 if everything is correct, -1 in case of error
 */
- int ifree(int inode_id){
+ int ifree(int inode_id);
 
  /*
   * @brief 	Frees block with id block_id
@@ -57,4 +57,4 @@ int bfree(int block_id);
  * @brief 	Searchs the block associated to inode with inode_id id
  * @return	associated inode block if everything is correct, -1 in case of error
 */
-int bmap ( int inode_id, int offset )
+int bmap ( int inode_id, int offset );
