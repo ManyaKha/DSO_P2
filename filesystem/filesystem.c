@@ -592,7 +592,7 @@ int checkFile (char * fileName){
  * @brief	Include integrity on a file.
  * @return	0 if success, -1 if the file does not exists, -2 in case of error.
  */
-
+/*
 int includeIntegrity (char * fileName)
 {
 	int inode_id ;
@@ -612,7 +612,7 @@ int includeIntegrity (char * fileName)
 	}
     return 0;
 }
-
+*/
 /*
  * @brief	Opens an existing file and checks its integrity
  * @return	The file descriptor if possible, -1 if file does not exist, -2 if the file is corrupted, -3 in case of error
