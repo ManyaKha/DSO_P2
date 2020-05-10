@@ -291,7 +291,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
-		inodes[inode_id].CRC[0] = 0; --> //DEBE IGNORARSE HASTA QUE HAGAMOS INCLUDE INTEGRITY
+		//inodes[inode_id].CRC[0] = 0; //DEBE IGNORARSE HASTA QUE HAGAMOS INCLUDE INTEGRITY
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -408,7 +408,7 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 			if (b_id < 0) {
 					return -1 ;
 			}
-			bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+			bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b);
 			//BLOCK_SIZE-inodes_x[fileDescriptor].f_seek --> numero de bytes que "puedo" escribir/leer todavía en el bloque
 			//CUIDADO: f_seek puede ser > BLOCK_SIZE --> mod
 			int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[fileDescriptor].f_seek%BLOCK_SIZE);
@@ -597,31 +597,36 @@ int includeIntegrity (char * fileName)
 {
 	int inode_id ;
 	inode_id = namei(fileName);
-	//File does not exist
+
+	//Check if file exists
 	if (inode_id < 0 || inode_id >= sBlock.numInodes){
 		return -1;
 	}
-	//File is opened
+
+	//Check if file is opened; crc cannot be calculated
 	if(inodes_x[inode_id].open==1){
 			printf("%s\n", "OPEN FILE");
 			return -2;
 	}
-	//File do not have integrity
-	//calcular crc de cada bloque o cargar todo el fichero a memoria (bloque de tamaño máximo de lo que ya esta escrito) --> casting
 
-	/*Por tanto, la solución consistiría en reservar un buffer lo suficientemente
-	grande para almacenar el contenido completo del fichero. Una vez hecha esta
-	reserva, cuyo tamaño sera de tantos bytes como bytes escritos hayan en el
-	fichero, debéis realizar una lectura de cada uno de los bloques y copiarlos a
-	dicho buffer. Finalmente, este buffer es el que pasareis a la función de CRC
-	para implementar el control de integridad que se pide en la práctica.*/
+	//calcular crc de cada bloque o cargar todo el fichero a memoria (bloque de tamaño máximo de lo que ya esta escrito) --> casting
+	//as we include integrity to all blocks, if the first one do not have, any will do
 	if(!(inodes[inode_id].CRC[0])){
-		int size = inodes[inode_id].size;
+		//loop to traverse the block
+		/*int size = inodes[inode_id].size;
 		char b[size];
-		readFile(inode_id, b, size);
+		readFile(inode_id, b, size);*/
 		//inodes[inode_id].CRC[0]=CRC32(b, sizeof(b));
+		for(int i=0; i<sBlock.numDataBlocks; i++)
+		{
+
+			//memmove(&(inodes[i*sBlock.inodesPerBlock]), b, sBlock.inodesPerBlock*sizeof(InodeDiskType));
+
+		}
+
 		printf("%s\n", "PUT CRC");
 	}
+
     return 0;
 }
 
@@ -664,7 +669,7 @@ int createLn(char *fileName, char *linkName)
     }
     strcpy(inodes[inode_id].name, linkName) ;
     inodes[inode_id].type = T_LINK ;
-    inodes[inode_id].directBlock[0] = 255 ;
+    inodes[inode_id].directBlock[0] = 255;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
 		char *str = fileName;
