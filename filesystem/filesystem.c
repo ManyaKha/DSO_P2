@@ -291,7 +291,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
-		inodes[inode_id].CRC[0] = 0;
+		inodes[inode_id].CRC[0] = 0; --> //DEBE IGNORARSE HASTA QUE HAGAMOS INCLUDE INTEGRITY
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -592,7 +592,7 @@ int checkFile (char * fileName){
  * @brief	Include integrity on a file.
  * @return	0 if success, -1 if the file does not exists, -2 in case of error.
  */
-
+//HABILITAR INTEGRIDAD - No hace nada más
 int includeIntegrity (char * fileName)
 {
 	int inode_id ;
@@ -607,6 +607,8 @@ int includeIntegrity (char * fileName)
 			return -2;
 	}
 	//File do not have integrity
+	//calcular crc de cada bloque o cargar todo el fichero a memoria (bloque de tamaño máximo de lo que ya esta escrito) --> casting
+
 	/*Por tanto, la solución consistiría en reservar un buffer lo suficientemente
 	grande para almacenar el contenido completo del fichero. Una vez hecha esta
 	reserva, cuyo tamaño sera de tantos bytes como bytes escritos hayan en el
@@ -629,7 +631,7 @@ int includeIntegrity (char * fileName)
  */
 int openFileIntegrity(char *fileName)
 {
-
+	//Usar open dentro!! cuando hayamoms comprobado que tiene integridad
     return -2;
 }
 
@@ -639,6 +641,7 @@ int openFileIntegrity(char *fileName)
  */
 int closeFileIntegrity(int fileDescriptor)
 {
+	//Usar close dentro!! cuando hayamos comprobado que tiene integridad
     return -1;
 }
 

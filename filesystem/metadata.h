@@ -39,7 +39,7 @@ typedef struct{
    char name[32+1]; /*File name. mAX 32 + 1(end)*/
    uint16_t size; /*File size in bytes*/
    uint8_t directBlock[5]; /*Direct block number array. Max 5 direct blocks*/
-   uint32_t CRC[5]; /*Data block assigned firm*/
+   uint32_t CRC[5]; /*Data block assigned firm*/ //NOS VALE UN CRC PARA TODO EL FICHERO ENTERO! NO HACE FALTA UNO POR BLOQUE
  }InodeDiskType;
 
  typedef InodeDiskType InodesDiskType[NUM_INODES];
