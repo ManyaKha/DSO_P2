@@ -291,7 +291,7 @@ int createFile(char *fileName)
     inodes[inode_id].directBlock[0] = 255 ;
     inodes_x[inode_id].f_seek = 0 ;
     inodes_x[inode_id].open  = 1 ;
-		inodes[inode_id].CRC[0] = 0;
+	inodes[inode_id].CRC[0] = 0;
     //return inode_id ;
 		return 0 ;
 	//return -2;
@@ -592,27 +592,60 @@ int checkFile (char * fileName){
  * @brief	Include integrity on a file.
  * @return	0 if success, -1 if the file does not exists, -2 in case of error.
  */
-/*
+
 int includeIntegrity (char * fileName)
 {
 	int inode_id ;
 	inode_id = namei(fileName);
-	//File does not exist
+	int b_id;
+	char b[BLOCK_SIZE] ;
+
+	//Check if file exists
 	if (inode_id < 0 || inode_id >= sBlock.numInodes){
 		return -1;
 	}
-	//File is opened
+
+	//Check if file is opened; crc cannot be calculated
 	if(inodes_x[inode_id].open==1){
 			printf("%s\n", "OPEN FILE");
 			return -2;
 	}
-	//File do not have integrity
+
+	//calcular crc de cada bloque o cargar todo el fichero a memoria (bloque de tamaño máximo de lo que ya esta escrito) --> casting
+	//as we include integrity to all blocks, if the first one do not have, any will do
+	int remaining_bytes= inodes[inode_id].size;
+	int i;
 	if(!(inodes[inode_id].CRC[0])){
-		printf("%s\n", "PUT CRC");
-	}
+		//loop to traverse the block
+		/*int size = inodes[inode_id].size;
+		char b[size];
+		readFile(inode_id, b, size);*/
+		//inodes[inode_id].CRC[0]=CRC32(b, sizeof(b));
+		while(remaining_bytes>0)
+		{
+			b_id = bmap(inode_id, inodes_x[inode_id].f_seek) ;
+			if (b_id < 0) {
+					return -1 ;
+			}
+			int buffer=bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
+			inodes[inode_id].CRC[i]=CRC32((const unsigned char*)buffer,inodes[inode_id].size);
+			int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[inode_id].f_seek%BLOCK_SIZE);
+			remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
+			int already_written_bytes = remaining_bytes - remaining_bytes;
+	    	memmove(buffer+already_written_bytes,
+							b+inodes_x[inode_id].f_seek,
+							remaining_bytes_in_block);
+	    	inodes_x[inode_id].f_seek += remaining_bytes_in_block ;
+			remaining_bytes = remaining_bytes - remaining_bytes_in_block;
+			}
+			i++;
+		}
+		
+		//printf("%s\n", "PUT CRC");
+
     return 0;
 }
-*/
+
 /*
  * @brief	Opens an existing file and checks its integrity
  * @return	The file descriptor if possible, -1 if file does not exist, -2 if the file is corrupted, -3 in case of error
