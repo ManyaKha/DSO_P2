@@ -11,13 +11,9 @@
 
 //#define MAX_NUM_FILES 48. MAX_INODE_SIZE:42 -> 132 bytes
 #define NUM_INODES 48
-//(NUM_INODES*directBlocks)
 #define NUM_DATA_BLOCKS 240
 #define BLOCK_SIZE 2048
-//MAX_DEVICE_SIZE 300 (blocks) / MIN_DEVICE_SIZE 230 (blocks)
-//#define MIN_DISK_SIZE 471040
 #define MIN_DISK_SIZE 230*BLOCK_SIZE
-//#define MAX_DISK_SIZE 614400
 #define MAX_DISK_SIZE 300*BLOCK_SIZE
 #define T_FILE 1
 #define T_LINK 2
