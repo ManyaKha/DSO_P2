@@ -284,7 +284,6 @@ int createFile(char *fileName)
  * @return	0 if success, -1 if the file does not exist, -2 in case of error..
  */
 
- //TO-DO: -2 – In case of other errors.
 int removeFile(char *fileName)
 {
 	int inode_id ;
@@ -292,16 +291,19 @@ int removeFile(char *fileName)
 	 inode_id = namei(fileName) ;
 	 if (inode_id < 0) {
 			 return -1;
+	 }else{
+		 //Delete from disk
+		 char b[BLOCK_SIZE];
+		 memset(b, 0, BLOCK_SIZE);
+		 bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+		 //Delete metadata
+		 bfree(inodes[inode_id].directBlock[0]) ;
+		 memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+		 ifree(inode_id) ;
+		 return 0 ;
 	 }
-	 //Delete from disk
-	 char b[BLOCK_SIZE];
-	 memset(b, 0, BLOCK_SIZE);
-	 bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-	 //Delete metadata
-	 bfree(inodes[inode_id].directBlock[0]) ;
-	 memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
-	 ifree(inode_id) ;
-	return 0 ;
+	 //In case of different error
+	 return -2;
 }
 
 /*
@@ -309,7 +311,6 @@ int removeFile(char *fileName)
  * @return	The file descriptor if possible, -1 if file does not exist, -2 in case of error..
  */
 
- //TO-DO: -2 – In case of other errors.
 int openFile(char *fileName)
 {
 	//get inode id from name
@@ -318,18 +319,22 @@ int openFile(char *fileName)
 	if (inode_id < 0){
 		return -1;
 	}
-	//If file is a symbolic link, get the linked file and open it.
-	if(inodes[inode_id].type==T_LINK){
-		char b[BLOCK_SIZE];
-		//CUANDO CREEMOS ENLACE SIMBOLICO RESERVAR BLOQUE DIRECTO Y GUARDAR A LO QUE APUNTA(NOMBRE FICHERO)
-		bread(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-		return openFile((char *)b);
+	else{
+		//If file is a symbolic link, get the linked file and open it.
+		if(inodes[inode_id].type==T_LINK){
+			char b[BLOCK_SIZE];
+			//CUANDO CREEMOS ENLACE SIMBOLICO RESERVAR BLOQUE DIRECTO Y GUARDAR A LO QUE APUNTA(NOMBRE FICHERO)
+			bread(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+			return openFile((char *)b);
 
+		}
+		//Open file and set seek pointer to the beggining
+		inodes_x[inode_id].f_seek = 0 ;
+		inodes_x[inode_id].open  = 1 ;
+		return inode_id ;
 	}
-	//Open file and set seek pointer to the beggining
-	inodes_x[inode_id].f_seek = 0 ;
-	inodes_x[inode_id].open  = 1 ;
-  return inode_id ;
+	//In case of different error
+	return -2;
 }
 
 /*
@@ -340,13 +345,13 @@ int closeFile(int fileDescriptor)
 { //Checking valid fd
 	if ((fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes)){
 		return -1 ;
-	}//Checking if file exists
+	}
+	//Checking if file exists
 	if(strlen(inodes[fileDescriptor].name)==0){
-		printf("NO EXISTE\n");
 		return -1;
-	}//Checking if file is open
+	}
+	//Checking if file is close
 	if(inodes_x[fileDescriptor].open==0){
-		printf("%s\n", "ALREADY CLOSED FILE");
 		return 0;
 	}
 	//Set seek pointer to the beggining of the file and close it.
@@ -658,14 +663,17 @@ int removeLn(char *linkName)
   if (inode_id < 0) {
 			return -1;
   }
-	//Delete on disk setting block to 0
-	char b[BLOCK_SIZE];
-	memset(b, 0, BLOCK_SIZE);
-	bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-	//Delete metadata
-  bfree(inodes[inode_id].directBlock[0]) ;
-  memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
-  ifree(inode_id) ;
+	else{
+		//Delete on disk setting block to 0
+		char b[BLOCK_SIZE];
+		memset(b, 0, BLOCK_SIZE);
+		bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+		//Delete metadata
+	  bfree(inodes[inode_id].directBlock[0]) ;
+	  memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+	  ifree(inode_id) ;
 
-	return 0 ;
+		return 0 ;
+	}
+	return -2;
 }
