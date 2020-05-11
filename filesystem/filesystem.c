@@ -450,19 +450,19 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 	}/*if (inodes_x[fileDescriptor].f_seek+numBytes > BLOCK_SIZE) {
          numBytes = BLOCK_SIZE - inodes_x[fileDescriptor].f_seek ;
      }*/
-		 
+
 	if(inodes_x[fileDescriptor].f_seek+numBytes > inodes[fileDescriptor].size){
 		numBytes = inodes[fileDescriptor].size - inodes_x[fileDescriptor].f_seek;
 	}
      if (numBytes <= 0) {
          return 0 ;
      }
-	 
+
      // en: get block
 	int remaining_bytes =  numBytes;
 	while(remaining_bytes>0){
 		b_id = bmap(fileDescriptor, inodes_x[fileDescriptor].f_seek) ;
-		if (255 == b_id) 
+		if (255 == b_id)
 		{
 			b_id = alloc() ;
 	    	if (b_id < 0) {
@@ -486,7 +486,7 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes)
 			 inodes[fileDescriptor].size = inodes_x[fileDescriptor].f_seek+1 ;
 		}
 	}
-		
+
 	return numBytes;
 }
 
@@ -595,8 +595,7 @@ int checkFile (char * fileName){
 
 int includeIntegrity (char * fileName)
 {
-	int inode_id ;
-	inode_id = namei(fileName);
+	int inode_id = namei(fileName); //filedescriptor
 	int b_id;
 	char b[BLOCK_SIZE] ;
 
@@ -629,18 +628,35 @@ int includeIntegrity (char * fileName)
 			}
 			int buffer=bread(DEVICE_IMAGE, sBlock.firstDataBlock+b_id, b) ;
 			inodes[inode_id].CRC[i]=CRC32((const unsigned char*)buffer,inodes[inode_id].size);
+
 			int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[inode_id].f_seek%BLOCK_SIZE);
+			
 			remaining_bytes_in_block = (remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
+
+			int already_read_bytes = inodes[inode_id].size - remaining_bytes; //doubt inodes[inode_id]
+
+			memmove(buffer+already_read_bytes,
+							b+inodes_x[inode_id].f_seek,
+							remaining_bytes_in_block); //buffer right variable?
+
+			//move the position of the pointer
+			inodes_x[inode_id].f_seek += remaining_bytes_in_block ;
+			remaining_bytes = remaining_bytes - remaining_bytes_in_block;
+			/*
+			inodes[inode_id].CRC[i]=CRC32((const unsigned char*)buffer,inodes[inode_id].size);
+			int remaining_bytes_in_block  = BLOCK_SIZE-(inodes_x[inode_id].f_seek%BLOCK_SIZE);
+			remaining_bytes_in_block =
+			(remaining_bytes_in_block<remaining_bytes)?remaining_bytes_in_block:remaining_bytes;
 			int already_written_bytes = remaining_bytes - remaining_bytes;
 	    	memmove(buffer+already_written_bytes,
 							b+inodes_x[inode_id].f_seek,
 							remaining_bytes_in_block);
 	    	inodes_x[inode_id].f_seek += remaining_bytes_in_block ;
 			remaining_bytes = remaining_bytes - remaining_bytes_in_block;
-			}
+			}*/
 			i++;
 		}
-		
+
 		//printf("%s\n", "PUT CRC");
 
     return 0;
