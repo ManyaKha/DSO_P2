@@ -181,15 +181,6 @@ int mkFS(long deviceSize)
 	sBlock.firstDataBlock  = 1 +sBlock.numInodesBlocks;
 	sBlock.deviceSize = deviceSize;
 
-	//BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR
-	printf("SuperblockType:%ld\n", sizeof(SuperblockType));
-	printf("InodeDiskType:%ld\n", sizeof(InodeDiskType));
-	printf("InodesDiskType:%ld\n", sizeof(InodesDiskType));
-	printf("TypeInodeMap:%ld\n", sizeof(TypeInodeMap));
-	printf("TypeBlockMap:%ld\n", sizeof(TypeBlockMap));
-	printf("numInodesBlocks:%d\n", sBlock.numInodesBlocks);
-	//BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR BORRAR
-
 	for(int i=0; i<sBlock.numInodes; i++){
 		i_map[i]=0; //free
 	}
@@ -236,7 +227,6 @@ int unmountFS(void)
 {
 	//Checking if system is already unmounted
 	if(0 == mounted){
-		printf("Error: FS already unmounted\n");
 		return -1;
 	}
 	//Checking if there are open files. If so, close them
@@ -257,6 +247,14 @@ int unmountFS(void)
 int createFile(char *fileName)
 {
 	int inode_id ;
+		//Checking if system is mounted
+		if(0 == mounted){
+			return -2;
+		}
+		//No valid name
+		if(strlen(fileName)>32 || strlen(fileName)==0){
+			return -2;
+		}
     // check file exist
     inode_id = namei(fileName) ;
     if (inode_id >= 0) {
@@ -287,23 +285,28 @@ int createFile(char *fileName)
 int removeFile(char *fileName)
 {
 	int inode_id ;
+		//Checking if system is mounted
+		if(0 == mounted){
+			return -1;
+		}
 	 //get inode id from name
 	 inode_id = namei(fileName) ;
 	 if (inode_id < 0) {
 			 return -1;
-	 }else{
-		 //Delete from disk
-		 char b[BLOCK_SIZE];
-		 memset(b, 0, BLOCK_SIZE);
-		 bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-		 //Delete metadata
-		 bfree(inodes[inode_id].directBlock[0]) ;
-		 memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
-		 ifree(inode_id) ;
-		 return 0 ;
 	 }
-	 //In case of different error
-	 return -2;
+	 //Checking if file is open
+	 if(inodes_x[inode_id].open==1){
+		 return -1;
+	 }
+	 //Delete from disk
+	 char b[BLOCK_SIZE];
+	 memset(b, 0, BLOCK_SIZE);
+	 bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+	 //Delete metadata
+	 bfree(inodes[inode_id].directBlock[0]) ;
+	 memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+	 ifree(inode_id) ;
+	 return 0 ;
 }
 
 /*
@@ -313,36 +316,43 @@ int removeFile(char *fileName)
 
 int openFile(char *fileName)
 {
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -2;
+	}
 	//get inode id from name
 	int inode_id ;
 	inode_id = namei(fileName);
 	if (inode_id < 0){
 		return -1;
 	}
-	else{
-		//If file is a symbolic link, get the linked file and open it.
-		if(inodes[inode_id].type==T_LINK){
-			char b[BLOCK_SIZE];
-			//CUANDO CREEMOS ENLACE SIMBOLICO RESERVAR BLOQUE DIRECTO Y GUARDAR A LO QUE APUNTA(NOMBRE FICHERO)
-			bread(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-			return openFile((char *)b);
-
-		}
-		//Open file and set seek pointer to the beggining
-		inodes_x[inode_id].f_seek = 0 ;
-		inodes_x[inode_id].open  = 1 ;
-		return inode_id ;
+	//Checking if file is already open
+	if(inodes_x[inode_id].open==1){
+		return -2;
 	}
-	//In case of different error
-	return -2;
+	//If file is a symbolic link, get the linked file and open it.
+	if(inodes[inode_id].type==T_LINK){
+		char b[BLOCK_SIZE];
+		bread(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+		return openFile((char *)b);
+
+	}
+	//Open file and set seek pointer to the beggining
+	inodes_x[inode_id].f_seek = 0 ;
+	inodes_x[inode_id].open  = 1 ;
+	return inode_id ;
 }
 
 /*
  * @brief	Closes a file.
  * @return	0 if success, -1 otherwise.
  */
-int closeFile(int fileDescriptor)
-{ //Checking valid fd
+int closeFile(int fileDescriptor){
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
+	//Checking valid fd
 	if ((fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes)){
 		return -1 ;
 	}
@@ -370,6 +380,10 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
 {
 		char b[BLOCK_SIZE]; //Buffer
 		int b_id; //Block id
+		//Checking if system is mounted
+		if(0 == mounted){
+			return -1;
+		}
 		//Check params
 		if ( (fileDescriptor < 0) || (fileDescriptor >= sBlock.numInodes) ){
 				return -1 ;
@@ -425,6 +439,10 @@ int readFile(int fileDescriptor, void *buffer, int numBytes)
  * @return	Number of bytes properly written, -1 in case of error.
  */
 int writeFile(int fileDescriptor, void *buffer, int numBytes){
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
 	char b[BLOCK_SIZE]; //Buffer
   int b_id; //Block id
 	//Check params
@@ -486,6 +504,10 @@ int writeFile(int fileDescriptor, void *buffer, int numBytes){
  * @return	0 if succes, -1 otherwise.
  */
 int lseekFile(int fileDescriptor, long offset, int whence){
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
 	//checking the paramenter of fileDescriptor. MAX:48
 	if ((fileDescriptor<0)||(fileDescriptor>=sBlock.numInodes)){
 		return -1 ;
@@ -525,6 +547,10 @@ int lseekFile(int fileDescriptor, long offset, int whence){
  */
 
 int checkFile (char * fileName){
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
 	int inode_id ;
 	inode_id = namei(fileName);
 	//File does not exist
@@ -533,12 +559,10 @@ int checkFile (char * fileName){
 	}
 	//File is opened
 	if(inodes_x[inode_id].open==1){
-			printf("%s\n", "OPEN FILE");
 			return -2;
 	}
 	//File do not have integrity
 	if(!(inodes[inode_id].CRC[0])){
-			printf("%s\n", "FILE DO NOT HAVE INTEGRITY");
 			return -2;
 	}
 	/*uint32_t original_crc = inodes[inode_id].CRC[0];
@@ -561,6 +585,10 @@ int checkFile (char * fileName){
 //HABILITAR INTEGRIDAD - No hace nada más
 int includeIntegrity (char * fileName)
 {
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
 	int inode_id ;
 	inode_id = namei(fileName);
 
@@ -571,7 +599,6 @@ int includeIntegrity (char * fileName)
 
 	//Check if file is opened; crc cannot be calculated
 	if(inodes_x[inode_id].open==1){
-			printf("%s\n", "OPEN FILE");
 			return -2;
 	}
 
@@ -590,7 +617,6 @@ int includeIntegrity (char * fileName)
 
 		}
 
-		printf("%s\n", "PUT CRC");
 	}
 
     return 0;
@@ -622,6 +648,14 @@ int closeFileIntegrity(int fileDescriptor)
  */
 int createLn(char *fileName, char *linkName)
 {
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -2;
+	}
+	//No valid name
+	if(strlen(linkName)>32 || strlen(linkName)==0){
+		return -2;
+	}
 	int inode_id ;
     //check file to link exists
     inode_id = namei(fileName) ;
@@ -653,27 +687,25 @@ int createLn(char *fileName, char *linkName)
  * @brief 	Deletes an existing symbolic link
  * @return 	0 if the file is correct, -1 if the symbolic link does not exist, -2 in case of error.
  */
-
- //FALTA -2 IN CASE OF ERROR
 int removeLn(char *linkName)
 {
+	//Checking if system is mounted
+	if(0 == mounted){
+		return -1;
+	}
 	int inode_id ;
   //get inode id from name checking it is valid
 	inode_id = namei(linkName) ;
   if (inode_id < 0) {
 			return -1;
   }
-	else{
-		//Delete on disk setting block to 0
-		char b[BLOCK_SIZE];
-		memset(b, 0, BLOCK_SIZE);
-		bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
-		//Delete metadata
-	  bfree(inodes[inode_id].directBlock[0]) ;
-	  memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
-	  ifree(inode_id) ;
-
-		return 0 ;
-	}
-	return -2;
+	//Delete on disk setting block to 0
+	char b[BLOCK_SIZE];
+	memset(b, 0, BLOCK_SIZE);
+	bwrite(DEVICE_IMAGE, inodes[inode_id].directBlock[0], b);
+	//Delete metadata
+  bfree(inodes[inode_id].directBlock[0]) ;
+  memset(&(inodes[inode_id]), 0, sizeof(InodeDiskType)) ;
+  ifree(inode_id) ;
+	return 0 ;
 }
